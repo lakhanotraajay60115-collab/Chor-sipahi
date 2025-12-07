@@ -1,4 +1,4 @@
-// server.js - રાજા-રાણી-વજીર-ચોર ગેમ લોજિક
+// server.js - રાજા-રાણી-વજીર-ચોર ગેમ લોજિક (સિપાહી સપોર્ટ સાથે)
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -9,20 +9,23 @@ const io = socketIo(server);
 
 // --- ગેમ વેરિએબલ્સ ---
 let players = {};
-let roles = ['રાજા', 'રાણી', 'વજીર', 'ચોર'];
+// રોલ્સમાં 'સિપાહી' ઉમેરાયો છે
+let roles = ['રાજા', 'રાણી', 'વજીર', 'ચોર']; 
 let roundActive = false;
 let votes = {}; // { voterId: votedPlayerId }
 let currentRound = 0;
-let currentLanguage = 'gu'; // Default language (મલ્ટી-લેંગ્વેજ માટે)
+let currentLanguage = 'gu'; // Default language
 
 const MAX_ROUNDS = 10;
 const MIN_PLAYERS = 4;
+const MAX_PLAYERS = 8; // મહત્તમ ખેલાડીઓ
 
 const ROLE_POINTS = {
     'રાજા': 10,
     'રાણી': 5,
     'વજીર': 3,
-    'ચોર': 0
+    'ચોર': 0,
+    'સિપાહી': 2 // સિપાહી માટે 2 પોઈન્ટ
 };
 
 // C. સ્ટેટિક ફાઇલોને સર્વ કરો
@@ -32,20 +35,30 @@ app.use(express.static('public'));
 
 function assignRoles() {
     const playerIds = Object.keys(players);
-    if (playerIds.length !== 4) return; // 4 ખેલાડીઓ જરૂરી
+    const playerCount = playerIds.length;
+    if (playerCount < MIN_PLAYERS) return; 
 
-    let shuffledRoles = [...roles].sort(() => 0.5 - Math.random());
+    // 1. મુખ્ય 4 રોલ લો
+    let requiredRoles = ['રાજા', 'રાણી', 'વજીર', 'ચોર'];
+    
+    // 2. વધારાના ખેલાડીઓ માટે 'સિપાહી' રોલ ઉમેરો
+    const sipahiCount = playerCount - 4;
+    for (let i = 0; i < sipahiCount; i++) {
+        requiredRoles.push('સિપાહી');
+    }
+    
+    let shuffledRoles = requiredRoles.sort(() => 0.5 - Math.random());
     
     // દરેક ખેલાડીને ભૂમિકા અને પોઈન્ટ સોંપો
     playerIds.forEach((id, index) => {
         players[id].role = shuffledRoles[index];
-        players[id].currentPoints = ROLE_POINTS[players[id].role]; // રોલના પ્રારંભિક પોઈન્ટ
+        players[id].currentPoints = ROLE_POINTS[players[id].role]; 
         players[id].isThief = (players[id].role === 'ચોર');
         // ક્લાયન્ટને તેમની ભૂમિકા મોકલો
         io.to(id).emit('yourRole', players[id].role);
     });
     
-    console.log(`રાઉન્ડ ${currentRound} માટે ભૂમિકાઓ સોંપવામાં આવી.`);
+    console.log(`રાઉન્ડ ${currentRound} માટે ભૂમિકાઓ સોંપવામાં આવી. કુલ ખેલાડીઓ: ${playerCount}`);
 }
 
 function startNewRound() {
@@ -71,7 +84,6 @@ function startNewRound() {
     });
 
     // વોટિંગ માટે 60 સેકન્ડનો સમય આપો
-    // જો આ સમય લંબાવવો હોય, તો અહીં 60000 ને બદલો
     setTimeout(calculateRoundScore, 60000); 
     console.log(`રાઉન્ડ ${currentRound} શરૂ થયો.`);
 }
@@ -81,40 +93,42 @@ function calculateRoundScore() {
     roundActive = false;
 
     const playerIds = Object.keys(players);
-    if (playerIds.length !== 4) return; 
+    const playerCount = playerIds.length;
+    if (playerCount < MIN_PLAYERS) return; 
 
     const thiefId = playerIds.find(id => players[id].isThief);
     let thiefCaught = false;
-    let incorrectVoters = []; // ખોટો વોટ કરનાર ID (અથવા વોટ ન કરનાર)
+    let incorrectVoters = []; 
     let thiefPointsGain = 0;
 
     // 1. વોટની ગણતરી કરો
-    const voteCounts = {}; // { votedPlayerId: count }
+    const voteCounts = {}; 
     Object.values(votes).forEach(votedId => {
         voteCounts[votedId] = (voteCounts[votedId] || 0) + 1;
     });
 
     // 2. ચોર પકડાયો કે નહીં તે નક્કી કરો
     const maxVotes = Math.max(...Object.values(voteCounts));
-    const mostVotedId = Object.keys(voteCounts).find(id => voteCounts[id] === maxVotes);
+    // જો વોટ ન થયા હોય તો maxVotes -Infinity આવશે, તેને 0 ગણો
+    const mostVotedId = Object.keys(voteCounts).find(id => voteCounts[id] === maxVotes) || null;
 
     if (mostVotedId === thiefId && maxVotes >= 2) { // ઓછામાં ઓછા 2 વોટ સાથે પકડાયો
         thiefCaught = true;
     }
     
     // 3. પોઈન્ટની ગણતરી કરો (મુખ્ય લોજિક)
-
     playerIds.forEach(id => {
         const votedFor = votes[id];
         
-        // જો ખેલાડી ચોર હોય, તો તે વોટ કરે કે ન કરે, તેના પોઈન્ટની ગણતરી છેલ્લે થશે
+        // જો ખેલાડી ચોર હોય
         if (players[id].isThief) {
              players[id].roundMessage = `તમે ચોર છો.`;
              return; 
         }
 
-        // અન્ય ખેલાડીઓ માટે (રાજા, રાણી, વજીર)
+        // અન્ય ખેલાડીઓ માટે (રાજા, રાણી, વજીર, સિપાહી)
         const currentPoints = players[id].currentPoints;
+        const roleName = players[id].role; // સિપાહી પણ અહીં જ હેન્ડલ થશે
         
         if (votedFor === undefined) {
             // વોટ નથી કર્યો
@@ -137,16 +151,16 @@ function calculateRoundScore() {
             }
         } else {
             // ચોર પકડાયો નથી
-            // રોલ પોઈન્ટ જાળવી રાખો (ચોર ન પકડાય તો કોઈ પોઈન્ટ ટ્રાન્સફર થતા નથી)
+            // રોલ પોઈન્ટ જાળવી રાખો
             players[id].totalScore += currentPoints;
             players[id].roundMessage = `ચોર પકડાયો નથી, તેથી ${currentPoints} પોઈન્ટ જાળવ્યા.`;
         }
     });
     
     // 4. ચોરના પોઈન્ટ ઉમેરો (અંતિમ ગણતરી)
-    const thiefIndex = playerIds.findIndex(id => players[id].isThief);
-    if(thiefIndex !== -1) {
-        const thiefPlayerId = playerIds[thiefIndex];
+    const thiefPlayer = Object.values(players).find(p => p.isThief);
+    if(thiefPlayer) {
+        const thiefPlayerId = thiefPlayer.id;
         if (!thiefCaught) {
             // જો ચોર પકડાયો ન હોય, તો તેને તેના રોલ પોઈન્ટ (0) + ચોરી કરેલા પોઈન્ટ મળે
             players[thiefPlayerId].totalScore += thiefPointsGain;
@@ -162,7 +176,7 @@ function calculateRoundScore() {
     io.emit('roundResult', {
         players: players,
         thiefCaught: thiefCaught,
-        thiefName: thiefId ? players[thiefId].name : 'N/A',
+        thiefName: thiefPlayer ? thiefPlayer.name : 'N/A',
         thiefId: thiefId,
         thiefPointsGain: thiefPointsGain,
         nextRound: currentRound < MAX_ROUNDS ? `નવો રાઉન્ડ ${currentRound + 1} 10 સેકન્ડમાં શરૂ થશે.` : 'ગેમ સમાપ્ત!',
@@ -195,7 +209,7 @@ function endGame() {
     currentRound = 0;
     votes = {};
     roundActive = false;
-    currentLanguage = 'gu'; // ભાષા રીસેટ
+    currentLanguage = 'gu'; 
     console.log('ગેમ સમાપ્ત. વિજેતા:', winner.name);
 }
 
@@ -203,16 +217,24 @@ function endGame() {
 io.on('connection', (socket) => {
     console.log('નવો ખેલાડી જોડાયો:', socket.id);
     
+    // જો મહત્તમ ખેલાડીઓ જોડાઈ ગયા હોય, તો કનેક્શન કાપી નાખો
+    if (Object.keys(players).length >= MAX_PLAYERS) {
+        socket.emit('serverFull');
+        socket.disconnect(true);
+        console.log('સર્વર ફૂલ. કનેક્શન કાપ્યું.');
+        return;
+    }
+    
     // પ્રારંભિક ડેટા સેટઅપ
     players[socket.id] = { 
         id: socket.id, 
-        name: `ખેલાડી ${Object.keys(players).length + 1}`, // Default નામ
+        name: `ખેલાડી ${Object.keys(players).length + 1}`, 
         totalScore: 0,
         role: null,
         isThief: false,
         currentPoints: 0,
         roundMessage: '',
-        isHost: Object.keys(players).length === 0 // પ્રથમ જોડાનારને Host બનાવો
+        isHost: Object.keys(players).length === 0 
     };
     
     // ક્લાયન્ટને તેની ID અને Host સ્થિતિ મોકલો
@@ -227,10 +249,9 @@ io.on('connection', (socket) => {
         players[socket.id].name = name;
         io.emit('playerListUpdate', Object.values(players));
         
-        // જો 4 ખેલાડીઓ જોડાઈ ગયા હોય, તો ગેમ શરૂ કરો
-        if (Object.keys(players).length === MIN_PLAYERS && !roundActive && currentRound === 0) {
-            console.log("4 ખેલાડીઓ જોડાયા. ગેમ શરૂ થાય છે.");
-            startNewRound();
+        // જો 4 ખેલાડીઓ જોડાઈ ગયા હોય અને ગેમ શરૂ ન થઈ હોય, તો ભાષા સેટ થયા પછી સ્ટાર્ટ કરો
+        if (Object.keys(players).length >= MIN_PLAYERS && !roundActive && currentRound === 0) {
+            console.log(`${MIN_PLAYERS} ખેલાડીઓ જોડાયા. ભાષા સેટિંગની રાહ છે.`);
         }
     });
 
@@ -240,8 +261,8 @@ io.on('connection', (socket) => {
             currentLanguage = newLang;
             io.emit('languageChanged', newLang);
             
-            // જો 4 ખેલાડીઓ જોડાયા હોય, તો ભાષા સેટ થયા પછી રાઉન્ડ શરૂ કરો
-             if (Object.keys(players).length === MIN_PLAYERS && !roundActive && currentRound === 0) {
+            // જો પૂરતા ખેલાડીઓ જોડાયા હોય, તો રાઉન્ડ શરૂ કરો
+             if (Object.keys(players).length >= MIN_PLAYERS && !roundActive && currentRound === 0) {
                  startNewRound();
              }
         }
@@ -253,7 +274,6 @@ io.on('connection', (socket) => {
         
         votes[socket.id] = votedPlayerId;
         
-        // બધા ખેલાડીઓને વોટની સ્થિતિ મોકલો (કેટલા વોટ પડ્યા)
         const totalVotes = Object.keys(votes).length;
         const totalPlayers = Object.keys(players).length;
         io.emit('voteUpdate', {
@@ -291,7 +311,7 @@ io.on('connection', (socket) => {
         
         io.emit('playerListUpdate', Object.values(players));
         
-        // જો રાઉન્ડ એક્ટિવ હોય અને ખેલાડીઓ 4 થી ઓછા થઈ જાય, તો ગેમ બંધ કરો
+        // જો રાઉન્ડ એક્ટિવ હોય અને ખેલાડીઓ MIN_PLAYERS થી ઓછા થઈ જાય, તો ગેમ બંધ કરો
         if (roundActive && Object.keys(players).length < MIN_PLAYERS) {
             io.emit('gameEnd', { message: 'ખેલાડીઓના અભાવે ગેમ સમાપ્ત થઈ.', currentLanguage: currentLanguage });
             players = {};
