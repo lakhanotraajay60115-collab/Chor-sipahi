@@ -1,14 +1,20 @@
 {
-  "name": "chor-shiphi",
-  "version": "1.0.0",
-  "description": "Multiplayer chor-shipahi game.",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "express": "^4.19.2",
-    "socket.io": "^4.7.5"
-  }
-
+  "name": "ચોર સિપાહી ગેમ",
+  "short_name": "Chor Sipahi",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#8a2be2",
+  "theme_color": "#8a2be2"
 }
