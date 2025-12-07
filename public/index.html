@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-translate="title">Chor Sipahi</title> <link rel="manifest" href="/manifest.json">
+    <title data-translate="title">Chor Sipahi</title>
+
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4058523032052967"
+      crossorigin="anonymous"></script>
+
+    <link rel="manifest" href="/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
 
     <style>
@@ -34,6 +39,9 @@
         .chat-message { margin-bottom: 5px; }
         .chat-name { font-weight: bold; color: var(--primary-color); margin-right: 5px; }
         #voteForm label { display: block; margin: 8px 0; text-align: left; }
+        
+        /* AdSense માટે જગ્યા */
+        .ad-container { margin: 20px 0; border: 1px dashed #ccc; padding: 10px; background-color: #fff8e1; }
     </style>
 </head>
 <body>
@@ -48,7 +56,13 @@
         </select>
     </div>
 
-    <h1 data-translate="appTitle">👑 ચોર-સિપાહી 🃏</h1> <p id="gameStatus" data-translate="connecting">કનેક્ટિંગ...</p>
+    <h1 data-translate="appTitle">👑 ચોર-સિપાહી 🃏</h1>
+    
+    <p id="gameStatus" data-translate="connecting">કનેક્ટિંગ...</p>
+
+    <div class="ad-container" id="ad-slot-top">
+        <p>જાહેરાત લોડ થઈ રહી છે...</p>
+    </div>
 
     <div id="nameRegistration">
         <input type="text" id="playerNameInput" placeholder="તમારું નામ દાખલ કરો" required style="width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 10px;">
@@ -88,6 +102,10 @@
         <h3 data-translate="activePlayersTitle">સક્રિય ખેલાડીઓ</h3>
         <ul id="playerNamesList"></ul>
     </div>
+    
+    <div class="ad-container" id="ad-slot-bottom">
+        <p>જાહેરાત લોડ થઈ રહી છે...</p>
+    </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script> 
@@ -108,8 +126,8 @@
         gu: {
             'રાજા': 'રાજા', 'રાણી': 'રાણી', 'વજીર': 'વજીર', 'ચોર': 'ચોર', 
             'સિપાહી': 'સિપાહી', 
-            title: "ચોર સિપાહી", // ટાઇટલ બદલાયું
-            appTitle: "👑 ચોર-સિપાહી 🃏", // ટાઇટલ બદલાયું
+            title: "ચોર સિપાહી", 
+            appTitle: "👑 ચોર-સિપાહી 🃏", 
             languageLabel: "ભાષા:",
             registerButton: "જોડાઓ (Join)",
             connecting: "કનેક્ટિંગ...",
@@ -127,9 +145,9 @@
         },
         hi: {
             'राजा': 'राजा', 'रानी': 'रानी', 'वजीर': 'वजीर', 'चोर': 'चोर',
-            'सिपाही': 'सिपाही', 
-            title: "चोर सिपाही", // ટાઇટલ બદલાયું
-            appTitle: "👑 चोर-सिपाही 🃏", // ટાઇટલ બદલાયું
+            'સિપાહી': 'सिपाही', 
+            title: "चोर सिपाही", 
+            appTitle: "👑 चोर-सिपाही 🃏", 
             languageLabel: "भाषा:",
             registerButton: "जुड़ें (Join)",
             connecting: "कनेक्टिंग...",
@@ -148,8 +166,8 @@
         en: {
             'King': 'King', 'Queen': 'Queen', 'Minister': 'Minister', 'Thief': 'Thief',
             'સિપાહી': 'Guard', 
-            title: "Chor Sipahi", // ટાઇટલ બદલાયું
-            appTitle: "👑 Chor-Sipahi 🃏", // ટાઇટલ બદલાયું
+            title: "Chor Sipahi", 
+            appTitle: "👑 Chor-Sipahi 🃏", 
             languageLabel: "Language:",
             registerButton: "Join",
             connecting: "Connecting...",
@@ -170,293 +188,12 @@
     const roleColors = {
         'રાજા': 'role-king', 'રાણી': 'role-queen', 'વજીર': 'role-minister', 'ચોર': 'role-thief',
         'સિપાહી': 'role-sipahi', 
-        'राजा': 'role-king', 'रानी': 'role-queen', 'वजीर': 'role-minister', 'चोर': 'role-thief',
+        'राजा': 'role-king', 'रानी': 'role-queen', 'वजीर': 'role-minister', 'ચોર': 'role-thief',
         'सिपाही': 'role-sipahi', 
         'King': 'role-king', 'Queen': 'role-queen', 'Minister': 'role-minister', 'Thief': 'role-thief',
         'Guard': 'role-sipahi' 
     };
 
-    // --- બાકીનો સોકેટ અને UI લોજિક સમાન ---
-    
     // UI અપડેટ કરો (ફંક્શન્સ)
     function translateUI() {
-        const langData = translations[currentLang] || translations.gu;
-
-        document.querySelectorAll('[data-translate]').forEach(el => {
-            const key = el.getAttribute('data-translate');
-            if (langData[key]) {
-                el.textContent = langData[key];
-            }
-        });
-        document.querySelectorAll('[data-translate-placeholder]').forEach(el => {
-            const key = el.getAttribute('data-translate-placeholder');
-            if (langData[key]) {
-                el.placeholder = langData[key];
-            }
-        });
-        
-        // ટાઇટલ અપડેટ કરો
-        document.title = langData.title;
-
-        // રાઉન્ડ ઇન્ફો અપડેટ (જો ઉપલબ્ધ હોય તો)
-        const roundInfoEl = document.getElementById('roundInfo');
-        if (roundInfoEl.dataset.round && roundInfoEl.dataset.max) {
-             roundInfoEl.textContent = langData.roundInfo(roundInfoEl.dataset.round, roundInfoEl.dataset.max);
-        }
-        
-        // સ્ટેટસ અપડેટ (જો ઉપલબ્ધ હોય તો)
-        const statusEl = document.getElementById('gameStatus');
-        if (statusEl.dataset.status) {
-            statusEl.textContent = langData.waiting(parseInt(statusEl.dataset.status));
-        }
-
-        // Host ભાષા સિલેક્ટર બતાવો
-        if (isHost) {
-            document.querySelector('.lang-selector').style.display = 'block';
-            document.getElementById('language-select').value = currentLang;
-        }
-    }
-
-    function updatePlayerList(playerData) {
-        players = {};
-        playerData.forEach(p => players[p.id] = p);
-        
-        const list = document.getElementById('playerNamesList');
-        list.innerHTML = '';
-        playerData.forEach(p => {
-            const item = document.createElement('li');
-            item.textContent = p.name + (p.isHost ? ' (Host)' : '');
-            list.appendChild(item);
-        });
-
-        const statusEl = document.getElementById('gameStatus');
-        if (playerData.length < MIN_PLAYERS) {
-            statusEl.dataset.status = playerData.length;
-            statusEl.textContent = translations[currentLang].waiting(playerData.length);
-        } else if (playerData.length >= MIN_PLAYERS && statusEl.dataset.status && parseInt(statusEl.dataset.status) < MIN_PLAYERS) {
-            statusEl.textContent = translations[currentLang].waiting(playerData.length); // રીસેટ
-        }
-        
-        if (myId && players[myId]) {
-             isHost = players[myId].isHost;
-             translateUI();
-        }
-    }
-
-    function handleLanguageChange(lang) {
-        if (isHost) {
-            socket.emit('setLanguage', lang);
-        }
-    }
-
-    function createVoteForm() {
-        const form = document.getElementById('voteForm');
-        form.innerHTML = '';
-        
-        const langData = translations[currentLang] || translations.gu;
-
-        Object.values(players).filter(p => p.id !== myId).forEach(p => {
-            const label = document.createElement('label');
-            label.innerHTML = `
-                <input type="radio" name="thiefVote" value="${p.id}" required>
-                ${p.name}
-            `;
-            form.appendChild(label);
-        });
-        
-        // વોટિંગ શરૂ થયા પછી જ બતાવો
-        document.getElementById('voteSection').style.display = 'block';
-        document.getElementById('submitVoteButton').disabled = false;
-    }
-
-    function displayRoundResult(data) {
-        const resultEl = document.getElementById('resultDisplay');
-        const langData = translations[data.currentLanguage] || translations.gu;
-        
-        let message = `રાઉન્ડ ${data.players[myId].roundMessage}`;
-        
-        if (data.thiefCaught) {
-            message += `<br>✅ **ચોર પકડાઈ ગયો!** (${data.thiefName})`;
-        } else {
-            message += `<br>❌ **ચોર છટકી ગયો!** (${data.thiefName} ને +${data.thiefPointsGain} પોઈન્ટ મળ્યા)`;
-        }
-        
-        message += `<br><br>${data.nextRound}`;
-
-        resultEl.innerHTML = message;
-        resultEl.style.display = 'block';
-        
-        // સ્કોર અપડેટ કરો
-        updateScoreboard(data.players);
-    }
-
-    function updateScoreboard(playerData) {
-        const list = document.getElementById('scoreList');
-        list.innerHTML = '';
-        
-        const sortedPlayers = Object.values(playerData).sort((a, b) => b.totalScore - a.totalScore);
-
-        sortedPlayers.forEach(p => {
-            const item = document.createElement('li');
-            item.innerHTML = `
-                <span>${p.name}</span>
-                <span>${p.totalScore}</span>
-            `;
-            list.appendChild(item);
-        });
-    }
-
-    // --- Socket ઇવેન્ટ્સ ---
-
-    socket.on('yourId', (id) => {
-        myId = id;
-    });
-
-    socket.on('setHost', (hostStatus) => {
-        isHost = hostStatus;
-        if (isHost) {
-            document.querySelector('.lang-selector').style.display = 'block';
-        }
-    });
-
-    socket.on('languageChanged', (newLang) => {
-        currentLang = newLang;
-        translateUI();
-    });
-
-    socket.on('playerListUpdate', (playerData) => {
-        updatePlayerList(playerData);
-    });
-
-    socket.on('newRound', (data) => {
-        document.getElementById('nameRegistration').style.display = 'none';
-        document.getElementById('mainGame').style.display = 'block';
-        document.getElementById('resultDisplay').style.display = 'none';
-        document.getElementById('voteSection').style.display = 'none'; 
-        
-        const roleEl = document.getElementById('roleDisplay');
-        const roundInfoEl = document.getElementById('roundInfo');
-
-        roundInfoEl.dataset.round = data.round;
-        roundInfoEl.dataset.max = data.maxRounds;
-        roundInfoEl.textContent = translations[data.currentLanguage].roundInfo(data.round, data.maxRounds);
-
-        roleEl.className = 'role-display';
-        roleEl.textContent = 'તમારી ભૂમિકા લોડ થઈ રહી છે...';
-        
-        setTimeout(createVoteForm, 2000); // 2 સેકન્ડ પછી વોટિંગ ફોર્મ બતાવો
-    });
-
-    socket.on('yourRole', (role) => {
-        myRole = role;
-        const roleEl = document.getElementById('roleDisplay');
-        const translatedRole = translations[currentLang][role] || role;
-        
-        roleEl.textContent = `તમારી ભૂમિકા: ${translatedRole}`;
-        roleEl.classList.add(roleColors[role] || 'role-default');
-
-        if (role === 'ચોર' || role === 'Chor' || role === 'Thief') {
-            document.getElementById('voteSection').style.display = 'none'; // ચોર વોટ ન કરી શકે
-        }
-    });
-
-    socket.on('voteUpdate', (data) => {
-        // ખેલાડીઓએ વોટ કરી દીધો છે, ચેટમાં મેસેજ બતાવી શકાય છે
-        const chatBox = document.getElementById('chatBox');
-        const messageEl = document.createElement('div');
-        messageEl.className = 'chat-message';
-        messageEl.innerHTML = `<span class="chat-name">${data.message}</span>`;
-        chatBox.appendChild(messageEl);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    });
-
-    socket.on('roundResult', (data) => {
-        displayRoundResult(data);
-        updateScoreboard(data.players);
-    });
-
-    socket.on('chatMessage', (data) => {
-        const chatBox = document.getElementById('chatBox');
-        const messageEl = document.createElement('div');
-        messageEl.className = 'chat-message';
-        messageEl.innerHTML = `<span class="chat-name">${data.name}:</span> ${data.message}`;
-        chatBox.appendChild(messageEl);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    });
-
-    socket.on('gameEnd', (data) => {
-        const resultEl = document.getElementById('resultDisplay');
-        const langData = translations[data.currentLanguage] || translations.gu;
-        
-        resultEl.style.display = 'block';
-        resultEl.innerHTML = `
-            <h2>${langData.gameEnd}</h2>
-            <p>${langData.winner(data.winner.name, data.winner.totalScore)}</p>
-            <button onclick="window.location.reload()" style="background-color: #ff6347;">નવી ગેમ શરૂ કરો</button>
-        `;
-        document.getElementById('mainGame').style.display = 'none';
-        updateScoreboard(data.finalScores);
-    });
-
-    socket.on('serverFull', () => {
-        alert("ગેમ રૂમ ફૂલ છે. મહત્તમ ૮ ખેલાડીઓ જ રમી શકે છે.");
-        window.location.reload(); 
-    });
-
-
-    // --- UI ઇવેન્ટ હેન્ડલર્સ ---
-    document.getElementById('registerButton').addEventListener('click', () => {
-        const name = document.getElementById('playerNameInput').value.trim();
-        if (name) {
-            socket.emit('registerName', name);
-            document.getElementById('playerNameInput').disabled = true;
-            document.getElementById('registerButton').disabled = true;
-            document.getElementById('gameStatus').textContent = translations[currentLang].waiting(Object.keys(players).length + 1);
-        }
-    });
-
-    document.getElementById('submitVoteButton').addEventListener('click', () => {
-        const selectedVote = document.querySelector('input[name="thiefVote"]:checked');
-        if (selectedVote) {
-            socket.emit('submitVote', selectedVote.value);
-            document.getElementById('submitVoteButton').disabled = true;
-            document.getElementById('voteSection').style.display = 'none';
-        } else {
-            alert('કૃપા કરીને કોઈ ખેલાડીને વોટ કરો.');
-        }
-    });
-
-    document.getElementById('sendChatButton').addEventListener('click', () => {
-        const input = document.getElementById('chatMessageInput');
-        const message = input.value.trim();
-        if (message) {
-            socket.emit('chatMessage', message);
-            input.value = '';
-        }
-    });
-    
-    document.getElementById('chatMessageInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('sendChatButton').click();
-        }
-    });
-
-    // પ્રથમ લોડ પર UI ટ્રાન્સલેટ કરો
-    translateUI();
-</script>
-
-<script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-          .then(registration => {
-            console.log('SW registered: ', registration);
-          })
-          .catch(registrationError => {
-            console.log('SW registration failed: ', registrationError);
-          });
-      });
-    }
-</script>
-</body>
-</html>
+        const langData = translations[currentLang] ||
