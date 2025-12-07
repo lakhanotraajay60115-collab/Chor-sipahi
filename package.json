@@ -1,7 +1,7 @@
 {
-  "name": "raja-rani-vazir-chor-game",
+  "name": "chor-shiphi",
   "version": "1.0.0",
-  "description": "Multiplayer Raja-Rani-Vazir-Chor game.",
+  "description": "Multiplayer chor-shipahi game.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -10,4 +10,5 @@
     "express": "^4.19.2",
     "socket.io": "^4.7.5"
   }
+
 }
