@@ -1,0 +1,13 @@
+{
+  "name": "raja-rani-vazir-chor-game",
+  "version": "1.0.0",
+  "description": "Multiplayer Raja-Rani-Vazir-Chor game.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
