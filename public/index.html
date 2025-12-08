@@ -345,7 +345,6 @@
             // જો હોસ્ટ હોય અને રૂમમાં જોડાયેલો હોય, તો સર્વરને જાણ કરો
             socket.emit('setLanguage', lang);
         }
-        // જો રૂમમાં ન જોડાયેલા હોય, તો માત્ર ક્લાયન્ટ-સાઇડ જ ભાષા બદલાશે
     }
     
     // આ ફંક્શન વૈશ્વિક સ્તરે ઉપલબ્ધ બનાવો
@@ -353,7 +352,6 @@
 
 
     function createVoteForm() {
-        // ... (અહીં કોઈ ફેરફારની જરૂર નથી)
         const form = document.getElementById('voteForm');
         form.innerHTML = '';
         
@@ -374,7 +372,6 @@
         const resultEl = document.getElementById('resultDisplay');
         const langData = translations[data.currentLanguage] || translations.gu;
         
-        // રોલના નામને ટ્રાન્સલેટ કરવાની જરૂર નથી, કારણ કે roundMessage સર્વરમાં જ તૈયાર થાય છે.
         let message = `રાઉન્ડ ${data.players[myId].roundMessage}`; 
         
         if (data.thiefCaught) {
@@ -391,8 +388,6 @@
         updateScoreboard(data.players);
     }
     
-    // ... (બાકીના ફંક્શન્સ) ...
-
     function updateScoreboard(playerData) {
         const list = document.getElementById('scoreList');
         list.innerHTML = '';
@@ -407,6 +402,15 @@
             `;
             list.appendChild(item);
         });
+    }
+
+    function getPlayerName() {
+        const name = document.getElementById('playerNameInput').value.trim();
+        if (!name) {
+             alert(translations[currentLang].namePlaceholder || 'કૃપા કરીને તમારું નામ દાખલ કરો.');
+             return null;
+        }
+        return name;
     }
 
     function resetGameUI() {
@@ -429,19 +433,77 @@
 
     socket.on('connect', () => {
         myId = socket.id;
-        document.getElementById('gameStatus').textContent = translations[currentLang].connecting;
+        // કનેક્ટ થયા પછી, 'કનેક્ટિંગ' માંથી બહાર આવો અને UI અપડેટ કરો
+        document.getElementById('gameStatus').textContent = translations[currentLang].connecting; 
+        translateUI(); 
+    });
+
+    socket.on('error', (message) => {
+        alert(`ભૂલ: ${message}`);
+        resetGameUI(); // ભૂલ આવે તો UI રીસેટ કરો
+    });
+
+    socket.on('roomCreated', (data) => {
+        myRoomId = data.roomId;
+        currentLang = data.currentLanguage;
+        isHost = data.isHost;
+
+        document.getElementById('roomSetup').style.display = 'none';
+        document.getElementById('mainGame').style.display = 'block';
+        document.getElementById('displayRoomId').textContent = myRoomId;
+        
+        // ભાષા બદલવાનું લોજિક અહીં મેન્યુઅલી ટ્રિગર કરો
+        handleLanguageChange(currentLang); 
+        
+        alert(`રૂમ ${myRoomId} બનાવવામાં આવ્યો. આ ID તમારા મિત્રોને મોકલો!`);
+    });
+
+    socket.on('roomJoined', (data) => {
+        myRoomId = data.roomId;
+        currentLang = data.currentLanguage;
+        isHost = data.isHost;
+
+        document.getElementById('roomSetup').style.display = 'none';
+        document.getElementById('mainGame').style.display = 'block';
+        document.getElementById('displayRoomId').textContent = myRoomId;
+        
+        // ભાષા બદલવાનું લોજિક અહીં મેન્યુઅલી ટ્રિગર કરો
+        handleLanguageChange(currentLang);
+    });
+
+    socket.on('setHost', (hostStatus) => {
+        isHost = hostStatus;
         translateUI();
     });
 
-    // ... (અન્ય socket.on ઇવેન્ટ્સ) ...
-    
     socket.on('languageChanged', (newLang) => {
         // આ ઇવેન્ટ હોસ્ટ દ્વારા મોકલવામાં આવે છે અને રૂમના બધા ખેલાડીઓ માટે ભાષા બદલે છે
         currentLang = newLang;
         document.getElementById('language-select').value = newLang; // સિલેક્ટર પણ બદલો
         translateUI();
     });
-    
+
+    socket.on('playerListUpdate', (playerData) => {
+        updatePlayerList(playerData);
+    });
+
+    socket.on('newRound', (data) => {
+        document.getElementById('resultDisplay').style.display = 'none';
+        document.getElementById('voteSection').style.display = 'none'; 
+        
+        const roleEl = document.getElementById('roleDisplay');
+        const roundInfoEl = document.getElementById('roundInfo');
+
+        roundInfoEl.dataset.round = data.round;
+        roundInfoEl.dataset.max = data.maxRounds;
+        roundInfoEl.textContent = translations[data.currentLanguage].roundInfo(data.round, data.maxRounds);
+
+        roleEl.className = 'role-display';
+        roleEl.textContent = 'તમારી ભૂમિકા લોડ થઈ રહી છે...';
+        
+        setTimeout(createVoteForm, 2000); 
+    });
+
     socket.on('yourRole', (role) => {
         myRole = role;
         const roleEl = document.getElementById('roleDisplay');
@@ -458,7 +520,113 @@
         }
     });
 
-    // ... (બાકીના socket.on ઇવેન્ટ્સ) ...
+    socket.on('voteUpdate', (data) => {
+        const chatBox = document.getElementById('chatBox');
+        const messageEl = document.createElement('div');
+        messageEl.className = 'chat-message';
+        messageEl.innerHTML = `<span class="chat-name">${data.message}</span>`;
+        chatBox.appendChild(messageEl);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    socket.on('roundResult', (data) => {
+        displayRoundResult(data);
+        updateScoreboard(data.players);
+    });
+
+    socket.on('chatMessage', (data) => {
+        const chatBox = document.getElementById('chatBox');
+        const messageEl = document.createElement('div');
+        messageEl.className = 'chat-message';
+        // ટાઇમસ્ટેમ્પ ઉમેરો
+        messageEl.innerHTML = `<span class="chat-name">${data.name}:</span> ${data.message} <span style="font-size: 0.7em; color: #888;">(${data.timestamp})</span>`;
+        chatBox.appendChild(messageEl);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
+    
+    socket.on('loadChatHistory', (history) => {
+        const chatBox = document.getElementById('chatBox');
+        chatBox.innerHTML = ''; 
+        
+        history.forEach(data => {
+            const messageEl = document.createElement('div');
+            messageEl.className = 'chat-message';
+            messageEl.innerHTML = `<span class="chat-name">${data.name}:</span> ${data.message} <span style="font-size: 0.7em; color: #888;">(${data.timestamp})</span>`;
+            chatBox.appendChild(messageEl);
+        });
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+
+    socket.on('gameEnd', (data) => {
+        const resultEl = document.getElementById('resultDisplay');
+        const langData = translations[data.currentLanguage] || translations.gu;
+        
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = `
+            <h2>${langData.gameEnd}</h2>
+            <p>${langData.winner(data.winner.name, data.winner.totalScore)}</p>
+            <button onclick="window.location.reload()" style="background-color: #ff6347;">નવી ગેમ શરૂ કરો</button>
+        `;
+        document.getElementById('mainGame').style.display = 'none';
+        updateScoreboard(data.finalScores);
+    });
+
+
+    // --- UI ઇવેન્ટ હેન્ડલર્સ ---
+
+    document.getElementById('createRoomButton').addEventListener('click', () => {
+        const name = getPlayerName();
+        if (name) {
+            socket.emit('createRoom', name);
+        } else {
+             alert(translations[currentLang].namePlaceholder || 'કૃપા કરીને તમારું નામ દાખલ કરો.');
+        }
+    });
+
+    document.getElementById('joinRoomButton').addEventListener('click', () => {
+        const name = getPlayerName();
+        const roomId = document.getElementById('roomIdInput').value.trim().toUpperCase();
+        
+        if (!name) {
+            alert(translations[currentLang].namePlaceholder || 'કૃપા કરીને તમારું નામ દાખલ કરો.');
+            return;
+        }
+
+        if (roomId.length < 4) {
+             alert('રૂમ ID માં ઓછામાં ઓછા ૪ અક્ષરો હોવા જોઈએ.');
+             return;
+        }
+        
+        socket.emit('joinRoom', { roomId, name });
+    });
+
+
+    document.getElementById('submitVoteButton').addEventListener('click', () => {
+        const selectedVote = document.querySelector('input[name="thiefVote"]:checked');
+        if (selectedVote) {
+            socket.emit('submitVote', selectedVote.value);
+            document.getElementById('submitVoteButton').disabled = true;
+            document.getElementById('voteSection').style.display = 'none';
+        } else {
+            alert('કૃપા કરીને કોઈ ખેલાડીને વોટ કરો.');
+        }
+    });
+
+    document.getElementById('sendChatButton').addEventListener('click', () => {
+        const input = document.getElementById('chatMessageInput');
+        const message = input.value.trim();
+        if (message) {
+            socket.emit('chatMessage', message);
+            input.value = '';
+        }
+    });
+    
+    document.getElementById('chatMessageInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('sendChatButton').click();
+        }
+    });
 
     // પ્રથમ લોડ પર UI ટ્રાન્સલેટ કરો
     translateUI();
@@ -478,4 +646,4 @@
     }
 </script>
 </body>
-    </html>
+</html>
