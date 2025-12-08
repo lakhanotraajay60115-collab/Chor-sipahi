@@ -84,16 +84,11 @@
             <strong id="displayRoomId" style="font-size: 1.2em; color: var(--primary-color);"></strong>
         </div>
 
+        <button id="startGameButton" data-translate="startGameButton" style="background-color: #007bff; display: none;">ગેમ શરૂ કરો (હોસ્ટ)</button>
+
         <p id="roundInfo" data-translate-template="roundInfo">રાઉન્ડ: ૦/૧૦</p>
         
-        <div id="roleDisplay">તમારી ભૂમિકા: ?</div>
-
-        <div id="voteSection" style="display: none;">
-            <h3 data-translate="votePrompt">કોણ ચોર છે? વોટ કરો:</h3>
-            <div id="voteForm" style="display: flex; flex-direction: column;">
-            </div>
-            <button id="submitVoteButton" data-translate="submitVote">વોટ સબમિટ કરો</button>
-        </div>
+        <div id="roleDisplay" class="role-display">તમારી ભૂમિકા: ?</div>
 
         <div id="chatSection">
             <h3 data-translate="chatTitle">ખેલાડીઓ સાથે વાતચીત</h3>
@@ -108,6 +103,13 @@
                 <input type="text" id="chatMessageInput" data-translate-placeholder="chatPlaceholder" placeholder="મેસેજ લખો...">
                 <button id="sendChatButton" data-translate="sendButton">મોકલો</button>
             </div>
+        </div>
+
+        <div id="voteSection" style="display: none;">
+            <h3 data-translate="votePrompt">કોણ ચોર છે? વોટ કરો:</h3>
+            <div id="voteForm" style="display: flex; flex-direction: column;">
+            </div>
+            <button id="submitVoteButton" data-translate="submitVote">વોટ સબમિટ કરો</button>
         </div>
         
     </div>
@@ -128,6 +130,8 @@
     </div>
 </div>
 
+<div id="remoteAudioContainer" style="display: none;"></div> 
+
 <script src="/socket.io/socket.io.js"></script> 
 
 <script>
@@ -141,10 +145,10 @@
     
     // વૉઇસ ચેટ વેરીએબલ્સ
     let localStream = null;
-    let peerConnections = {}; // WebRTC કનેક્શન સાચવવા માટે
+    let peerConnections = {}; 
     const voiceStatusEl = document.getElementById('voiceStatus');
     const toggleMicButton = document.getElementById('toggleMicButton');
-    // STUN સર્વર (Google) - P2P કનેક્શન સ્થાપિત કરવા માટે જરૂરી છે
+    
     const servers = {
         iceServers: [
             { urls: 'stun:stun.l.google.com:19302' } 
@@ -155,7 +159,7 @@
     const MAX_PLAYERS = 8;
     const MIN_PLAYERS = 4;
     
-    // મૂળભૂત રોલના નામો જે સર્વર મોકલે છે (અહીં ટ્રાન્સલેશન માટે જાળવી રાખેલ છે)
+    // મૂળભૂત રોલના નામો જે સર્વર મોકલે છે 
     const ROLE_NAMES_GUJ = {
         KING: 'રાજા',
         QUEEN: 'રાણી',
@@ -168,7 +172,6 @@
     // --- ભાષાંતર માટેનો મુખ્ય ડેટા ઑબ્જેક્ટ ---
     const translations = {
         gu: {
-            // રોલ ટ્રાન્સલેશન (સર્વરથી આવતા રોલના નામની કી વાપરો)
             [ROLE_NAMES_GUJ.KING]: 'રાજા', 
             [ROLE_NAMES_GUJ.QUEEN]: 'રાણી', 
             [ROLE_NAMES_GUJ.MINISTER]: 'વજીર', 
@@ -204,11 +207,11 @@
             adLoading: "જાહેરાત લોડ થઈ રહી છે...",
             host: "હોસ્ટ",
             yourRole: "તમારી ભૂમિકા",
-            // વૉઇસ ચેટ ટ્રાન્સલેશન
             voiceStatus: "વૉઇસ ચેટ સ્ટેટસ: નિષ્ક્રિય",
             micButtonStart: "માઇક શરૂ કરો",
             micButtonStop: "માઇક બંધ કરો",
-            micPermissionError: "માઇક્રોફોન ઍક્સેસ નામંજૂર થયો."
+            micPermissionError: "માઇક્રોફોન ઍક્સેસ નામંજૂર થયો.",
+            startGameButton: "ગેમ શરૂ કરો (હોસ્ટ)"
         },
         hi: {
             [ROLE_NAMES_GUJ.KING]: 'राजा', 
@@ -246,11 +249,11 @@
             adLoading: "विज्ञापन लोड हो रहा है...",
             host: "होस्ट",
             yourRole: "आपकी भूमिका",
-            // વૉઇસ ચેટ ટ્રાન્સલેશન
             voiceStatus: "वॉयस चैट स्टेटस: निष्क्रिय",
             micButtonStart: "माइक शुरू करें",
             micButtonStop: "माइक बंद करें",
-            micPermissionError: "माइक्रोफ़ोन एक्सेस अस्वीकार किया गया।"
+            micPermissionError: "माइक्रोफ़ोन एक्सेस अस्वीકાર किया गया।",
+            startGameButton: "गेम शुरू करें (होस्ट)"
         },
         en: {
             [ROLE_NAMES_GUJ.KING]: 'King', 
@@ -288,11 +291,11 @@
             adLoading: "Ad is loading...",
             host: "Host",
             yourRole: "Your Role",
-            // વૉઇસ ચેટ ટ્રાન્સલેશન
             voiceStatus: "Voice Chat Status: Inactive",
             micButtonStart: "Start Mic",
             micButtonStop: "Stop Mic",
-            micPermissionError: "Microphone access denied."
+            micPermissionError: "Microphone access denied.",
+            startGameButton: "Start Game (Host)"
         }
     };
 
@@ -305,158 +308,50 @@
     };
 
 
-    // --- WebRTC કનેક્શન લોજિક ---
-
-    // 1. પીઅર કનેક્શન સેટઅપ કરવું
-    function createPeerConnection(remoteId, isOfferer) {
-        const pc = new RTCPeerConnection(servers);
-        
-        // સ્થાનિક સ્ટ્રીમ (માઇક્રોફોન) ઉમેરો
-        if (localStream) {
-            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+    // --- ઉપયોગી UI ફંક્શન્સ ---
+    
+    function getPlayerName() {
+        const name = document.getElementById('playerNameInput').value.trim();
+        if (!name) {
+             alert(translations[currentLang].namePlaceholder || 'કૃપા કરીને તમારું નામ દાખલ કરો.');
+             return null;
         }
-
-        // ICE Candidate ઇવેન્ટ હેન્ડલર (સિગ્નલિંગ)
-        pc.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit('iceCandidate', {
-                    candidate: event.candidate,
-                    toId: remoteId
-                });
-            }
-        };
-        
-        // રિમોટ સ્ટ્રીમ (અન્ય ખેલાડીનો ઑડિયો) પ્રાપ્ત થયો
-        pc.ontrack = (event) => {
-            // માત્ર ઑડિયો ટ્રેક માટે
-            if (event.track.kind === 'audio') {
-                let remoteAudio = document.getElementById(`audio-${remoteId}`);
-                if (!remoteAudio) {
-                    remoteAudio = document.createElement('audio');
-                    remoteAudio.id = `audio-${remoteId}`;
-                    remoteAudio.autoplay = true;
-                    // Note: ઑડિયો ટેગને DOM માં ક્યાંક ઉમેરવું જરૂરી છે
-                    document.body.appendChild(remoteAudio); 
-                }
-                remoteAudio.srcObject = event.streams[0];
-                console.log(`Received audio track from ${remoteId}`);
-            }
-        };
-
-        peerConnections[remoteId] = pc;
-        
-        // જો આ યુઝર Offer કરનાર હોય, તો SDP Offer બનાવો
-        if (isOfferer) {
-            pc.createOffer()
-                .then(offer => pc.setLocalDescription(offer))
-                .then(() => {
-                    socket.emit('offer', {
-                        offer: pc.localDescription,
-                        toId: remoteId
-                    });
-                });
-        }
-        
-        return pc;
+        return name;
     }
 
-    // 2. બધા ખેલાડીઓ સાથે કનેક્શન શરૂ કરો
-    function startAllPeerConnections() {
-        const playersInRoom = Object.keys(players);
-        playersInRoom.forEach(playerId => {
-            if (playerId !== myId && !peerConnections[playerId]) {
-                // હોસ્ટ હંમેશા પહેલી Offer મોકલે છે
-                if (isHost) { 
-                    createPeerConnection(playerId, true);
-                }
-            }
+    function updateScoreboard(finalScores) {
+        const list = document.getElementById('scoreList');
+        list.innerHTML = '';
+        
+        const sortedPlayers = Object.values(finalScores).sort((a, b) => b.totalScore - a.totalScore);
+
+        sortedPlayers.forEach(p => {
+            const item = document.createElement('li');
+            item.innerHTML = `
+                <span>${p.name}</span>
+                <span>${p.totalScore}</span>
+            `;
+            list.appendChild(item);
         });
-        // જો યુઝર હોસ્ટ ન હોય, તો તેને voiceReady સિગ્નલ મોકલો
-        if(!isHost) {
-             socket.emit('voiceReady');
-        }
     }
 
-    // 3. પીઅર કનેક્શન બંધ કરવું
-    function closePeerConnection(remoteId) {
-        if (peerConnections[remoteId]) {
-            peerConnections[remoteId].close();
-            delete peerConnections[remoteId];
+    function displayRoundResult(data) {
+        const resultEl = document.getElementById('resultDisplay');
+        const langData = translations[data.currentLanguage] || translations.gu;
+        
+        const thiefName = data.thiefName;
+        const message = data.thiefCaught 
+            ? langData.thiefCaught(thiefName)
+            : langData.thiefEscaped(thiefName, data.thiefPointsGain);
             
-            // ઑડિયો ઘટક દૂર કરો
-            const audioEl = document.getElementById(`audio-${remoteId}`);
-            if (audioEl) audioEl.remove();
-            
-            console.log(`Peer connection closed for ${remoteId}`);
-        }
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = `
+            <h2>${message}</h2>
+            <p>${langData.nextRound}</p>
+        `;
     }
     
-    // --- માઇક્રોફોન ઍક્સેસ ફંક્શન ---
-    async function startMic() {
-        if (localStream) return; // જો પહેલેથી ચાલુ હોય તો કંઈ ન કરો
-
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            localStream = stream;
-            
-            // UI અપડેટ
-            voiceStatusEl.textContent = translations[currentLang].voiceStatus.replace(
-                /(નિષ્ક્રિય|Inactive|निष्ક્રિય)/, 
-                (currentLang === 'gu' ? 'સક્રિય' : currentLang === 'hi' ? 'सक्रिय' : 'Active')
-            );
-            toggleMicButton.textContent = translations[currentLang].micButtonStop;
-            toggleMicButton.style.backgroundColor = '#4CAF50'; 
-            toggleMicButton.removeEventListener('click', startMic);
-            toggleMicButton.addEventListener('click', stopMic);
-            
-            // બધા હાલના કનેક્શન્સમાં નવી સ્ટ્રીમ ઉમેરો
-            Object.values(peerConnections).forEach(pc => {
-                 localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-            });
-            
-            // જો રૂમમાં હોવ, તો કનેક્શન શરૂ કરો
-            if(myRoomId) {
-                 startAllPeerConnections();
-            }
-
-        } catch (err) {
-            console.error("Error accessing microphone:", err);
-            alert(translations[currentLang].micPermissionError);
-            voiceStatusEl.textContent = translations[currentLang].voiceStatus;
-        }
-    }
-
-    function stopMic() {
-        if (localStream) {
-            localStream.getTracks().forEach(track => {
-                // બધા પીઅર કનેક્શન્સમાંથી ટ્રેક દૂર કરો
-                Object.values(peerConnections).forEach(pc => {
-                    pc.getSenders().forEach(sender => {
-                        if (sender.track === track) {
-                            pc.removeTrack(sender);
-                        }
-                    });
-                });
-                track.stop();
-            });
-            localStream = null;
-        }
-        
-        // UI અપડેટ
-        voiceStatusEl.textContent = translations[currentLang].voiceStatus;
-        toggleMicButton.textContent = translations[currentLang].micButtonStart;
-        toggleMicButton.style.backgroundColor = '#ff6347'; 
-        toggleMicButton.removeEventListener('click', stopMic);
-        toggleMicButton.addEventListener('click', startMic);
-        
-        // સર્વરને જાણ કરો કે વૉઇસ બંધ છે
-        if(myRoomId) {
-             socket.emit('voiceStop');
-        }
-    }
-
-
-    // --- UI અપડેટ કરો (ફંક્શન્સ) ---
+    // --- UI અપડેટ કરો (ટ્રાન્સલેશન અને સ્ટેટસ) ---
     function translateUI() {
         const langData = translations[currentLang] || translations.gu;
 
@@ -475,7 +370,6 @@
         
         document.title = langData.title;
 
-        // રાઉન્ડ માહિતી ટ્રાન્સલેટ કરો (જો તે સેટ હોય તો)
         const roundInfoEl = document.getElementById('roundInfo');
         if (roundInfoEl.dataset.round && roundInfoEl.dataset.max) {
              roundInfoEl.textContent = langData.roundInfo(roundInfoEl.dataset.round, roundInfoEl.dataset.max);
@@ -486,14 +380,15 @@
         const statusEl = document.getElementById('gameStatus');
         if (statusEl.dataset.status) {
             const count = parseInt(statusEl.dataset.status);
-            if(count >= MIN_PLAYERS) {
-                 statusEl.textContent = langData.gameStarted;
-            } else {
+            
+            // જો રૂમ બન્યો હોય અને MIN_PLAYERS કરતા ઓછા હોય
+            if(myRoomId && count < MIN_PLAYERS) {
                  statusEl.textContent = langData.waiting(count);
+            } else if (myRoomId) {
+                 statusEl.textContent = langData.gameStarted; // જો MIN_PLAYERS કરતા વધુ હોય
             }
         }
         
-        // રોલ ડિસ્પ્લેને પણ ટ્રાન્સલેટ કરો 
         const roleEl = document.getElementById('roleDisplay');
         const defaultRoleLabel = langData.yourRole || 'તમારી ભૂમિકા'; 
         
@@ -506,12 +401,10 @@
         
         document.getElementById('language-select').value = currentLang;
         
-        // પ્લેયર લિસ્ટ અપડેટ કરો
         if (Object.keys(players).length > 0) {
             updatePlayerList(Object.values(players)); 
         }
 
-        // વૉઇસ બટન અને સ્ટેટસ ટ્રાન્સલેટ કરો
         if (toggleMicButton && voiceStatusEl) {
             if (localStream) {
                  toggleMicButton.textContent = langData.micButtonStop;
@@ -522,6 +415,8 @@
                  voiceStatusEl.textContent = langData.voiceStatus;
             }
         }
+        
+        document.getElementById('startGameButton').textContent = langData.startGameButton;
     }
 
     function updatePlayerList(playerData) {
@@ -546,13 +441,21 @@
         const statusEl = document.getElementById('gameStatus');
         statusEl.dataset.status = playerData.length;
 
-        if (playerData.length >= MIN_PLAYERS) {
+        if (playerData.length >= MIN_PLAYERS && myRoomId) {
              statusEl.textContent = langData.gameStarted;
-        } else {
+        } else if (myRoomId) {
              statusEl.textContent = langData.waiting(playerData.length);
         }
         
-        // પ્લેયર લિસ્ટ અપડેટ થયા પછી WebRTC કનેક્શન્સ તપાસો (જો માઇક ચાલુ હોય તો)
+        // હોસ્ટ બટનનું ડિસ્પ્લે
+        const startGameButton = document.getElementById('startGameButton');
+        if (isHost && !players[myId].currentRole) { 
+            startGameButton.style.display = 'block';
+            startGameButton.disabled = playerData.length < MIN_PLAYERS;
+        } else {
+            startGameButton.style.display = 'none';
+        }
+        
         if (localStream) {
             startAllPeerConnections(); 
         }
@@ -592,6 +495,7 @@
         document.getElementById('mainGame').style.display = 'none';
         document.getElementById('resultDisplay').style.display = 'none';
         document.getElementById('voteSection').style.display = 'none';
+        document.getElementById('startGameButton').style.display = 'none'; 
         document.getElementById('roomSetup').style.display = 'block';
         document.getElementById('roleDisplay').textContent = 'તમારી ભૂમિકા: ?';
         document.getElementById('roleDisplay').className = 'role-display';
@@ -610,6 +514,140 @@
         translateUI(); 
     }
     
+    // --- WebRTC કનેક્શન લોજિક ---
+
+    function createPeerConnection(remoteId, isOfferer) {
+        const pc = new RTCPeerConnection(servers);
+        
+        if (localStream) {
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        }
+
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit('iceCandidate', {
+                    candidate: event.candidate,
+                    toId: remoteId
+                });
+            }
+        };
+        
+        pc.ontrack = (event) => {
+            if (event.track.kind === 'audio') {
+                let remoteAudio = document.getElementById(`audio-${remoteId}`);
+                if (!remoteAudio) {
+                    remoteAudio = document.createElement('audio');
+                    remoteAudio.id = `audio-${remoteId}`;
+                    remoteAudio.autoplay = true;
+                    // Mute the remote audio by default to prevent feedback 
+                    remoteAudio.muted = false; // Set to false to hear other players
+                    document.getElementById('remoteAudioContainer').appendChild(remoteAudio); 
+                }
+                remoteAudio.srcObject = event.streams[0];
+                console.log(`Received audio track from ${remoteId}`);
+            }
+        };
+
+        peerConnections[remoteId] = pc;
+        
+        if (isOfferer) {
+            pc.createOffer()
+                .then(offer => pc.setLocalDescription(offer))
+                .then(() => {
+                    socket.emit('offer', {
+                        offer: pc.localDescription,
+                        toId: remoteId
+                    });
+                });
+        }
+        
+        return pc;
+    }
+
+    function startAllPeerConnections() {
+        const playersInRoom = Object.keys(players);
+        playersInRoom.forEach(playerId => {
+            if (playerId !== myId && !peerConnections[playerId]) {
+                if (isHost) { 
+                    createPeerConnection(playerId, true);
+                }
+            }
+        });
+        
+        if(myRoomId && localStream) { // જો માઇક ચાલુ હોય તો જ રેડી સિગ્નલ મોકલો
+             socket.emit('voiceReady');
+        }
+    }
+
+    function closePeerConnection(remoteId) {
+        if (peerConnections[remoteId]) {
+            peerConnections[remoteId].close();
+            delete peerConnections[remoteId];
+            
+            const audioEl = document.getElementById(`audio-${remoteId}`);
+            if (audioEl) audioEl.remove();
+        }
+    }
+    
+    // --- માઇક્રોફોન ઍક્સેસ ફંક્શન ---
+    async function startMic() {
+        if (localStream) return; 
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            localStream = stream;
+            
+            voiceStatusEl.textContent = translations[currentLang].voiceStatus.replace(
+                /(નિષ્ક્રિય|Inactive|निष्क्रिय)/, 
+                (currentLang === 'gu' ? 'સક્રિય' : currentLang === 'hi' ? 'सक्रिय' : 'Active')
+            );
+            toggleMicButton.textContent = translations[currentLang].micButtonStop;
+            toggleMicButton.style.backgroundColor = '#4CAF50'; 
+            toggleMicButton.removeEventListener('click', startMic);
+            toggleMicButton.addEventListener('click', stopMic);
+            
+            Object.values(peerConnections).forEach(pc => {
+                 localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+            });
+            
+            if(myRoomId) {
+                 startAllPeerConnections();
+            }
+
+        } catch (err) {
+            console.error("Error accessing microphone:", err);
+            alert(translations[currentLang].micPermissionError);
+            voiceStatusEl.textContent = translations[currentLang].voiceStatus;
+            localStream = null;
+        }
+    }
+
+    function stopMic() {
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                Object.values(peerConnections).forEach(pc => {
+                    pc.getSenders().forEach(sender => {
+                        if (sender.track === track) {
+                            pc.removeTrack(sender);
+                        }
+                    });
+                });
+                track.stop();
+            });
+            localStream = null;
+        }
+        
+        voiceStatusEl.textContent = translations[currentLang].voiceStatus;
+        toggleMicButton.textContent = translations[currentLang].micButtonStart;
+        toggleMicButton.style.backgroundColor = '#ff6347'; 
+        toggleMicButton.removeEventListener('click', stopMic);
+        toggleMicButton.addEventListener('click', startMic);
+        
+        if(myRoomId) {
+             socket.emit('voiceStop');
+        }
+    }
+
     // --- Socket ઇવેન્ટ્સ અને WebRTC સિગ્નલિંગ હેન્ડલર્સ ---
 
     socket.on('connect', () => {
@@ -620,7 +658,11 @@
 
     socket.on('error', (message) => {
         alert(`ભૂલ: ${message}`);
-        resetGameUI(); 
+        
+        // જો રૂમ બનાવવામાં/જોડાવામાં ભૂલ થાય, તો UI રીસેટ કરો
+        if (!myRoomId) {
+             resetGameUI();
+        }
     });
 
     socket.on('roomCreated', (data) => {
@@ -648,23 +690,19 @@
         
         handleLanguageChange(currentLang);
     });
-
+    
     // --- WebRTC સિગ્નલિંગ રીસીવર્સ ---
 
-    // અન્ય યુઝર વૉઇસ માટે તૈયાર છે (હોસ્ટ કનેક્શન શરૂ કરશે)
     socket.on('userReadyForVoice', (userId) => {
-        console.log(`User ${userId} is ready for voice chat.`);
-        // જો આપણે હોસ્ટ હોઈએ અને આપણું માઇક ચાલુ હોય, તો Offer કરો
         if (isHost && localStream) {
             createPeerConnection(userId, true);
         }
     });
 
-    // 2. Offer (કનેક્શનની વિનંતી) પ્રાપ્ત થઈ
     socket.on('offer', (data) => {
         let pc = peerConnections[data.fromId];
         if (!pc) {
-            pc = createPeerConnection(data.fromId, false); // Offer સ્વીકારનાર
+            pc = createPeerConnection(data.fromId, false);
         }
 
         pc.setRemoteDescription(new RTCSessionDescription(data.offer))
@@ -678,7 +716,6 @@
             });
     });
 
-    // 3. Answer (ઓફરનો સ્વીકાર) પ્રાપ્ત થયો
     socket.on('answer', (data) => {
         const pc = peerConnections[data.fromId];
         if (pc) {
@@ -686,27 +723,22 @@
         }
     });
 
-    // 4. ICE Candidate પ્રાપ્ત થયો
     socket.on('iceCandidate', (data) => {
         const pc = peerConnections[data.fromId];
         if (pc && data.candidate) {
-            // ખાતરી કરો કે remoteDescription સેટ છે
              if (pc.remoteDescription) {
                 pc.addIceCandidate(new RTCIceCandidate(data.candidate))
                     .catch(e => console.error('Error adding received ice candidate:', e));
-             } else {
-                 console.log('Remote description not set yet for candidate.');
              }
         }
     });
 
-    // 5. યુઝર ડિસ્કનેક્ટ થયો
     socket.on('userDisconnectedVoice', (userId) => {
         closePeerConnection(userId);
     });
 
 
-    // --- બાકીના સોકેટ હેન્ડલર્સ ---
+    // --- ગેમ અને ચેટ હેન્ડલર્સ ---
     socket.on('setHost', (hostStatus) => {
         isHost = hostStatus;
         translateUI();
@@ -720,14 +752,21 @@
 
     socket.on('playerListUpdate', (playerData) => {
         updatePlayerList(playerData);
+        // જો ખેલાડીઓની સંખ્યા મિનિમમ હોય અને હોસ્ટ હોય, તો બટન બતાવો
+        const startGameButton = document.getElementById('startGameButton');
+        if (isHost && playerData.length >= MIN_PLAYERS) {
+            startGameButton.style.display = 'block';
+        } else if (isHost) {
+            startGameButton.style.display = 'none';
+        }
     });
 
     socket.on('newRound', (data) => {
         document.getElementById('resultDisplay').style.display = 'none';
         document.getElementById('voteSection').style.display = 'none'; 
+        document.getElementById('startGameButton').style.display = 'none'; // ગેમ શરૂ થયા પછી બટન છુપાવો
         
         const roundInfoEl = document.getElementById('roundInfo');
-
         roundInfoEl.dataset.round = data.round;
         roundInfoEl.dataset.max = data.maxRounds;
         
@@ -735,6 +774,7 @@
 
         document.getElementById('roleDisplay').className = 'role-display';
         
+        // 2 સેકન્ડ પછી વોટ ફોર્મ બનાવો
         setTimeout(createVoteForm, 2000); 
     });
 
@@ -799,8 +839,6 @@
         const name = getPlayerName();
         if (name) {
             socket.emit('createRoom', name);
-        } else {
-             alert(translations[currentLang].namePlaceholder || 'કૃપા કરીને તમારું નામ દાખલ કરો.');
         }
     });
 
@@ -808,10 +846,7 @@
         const name = getPlayerName();
         const roomId = document.getElementById('roomIdInput').value.trim().toUpperCase();
         
-        if (!name) {
-            alert(translations[currentLang].namePlaceholder || 'કૃપા કરીને તમારું નામ દાખલ કરો.');
-            return;
-        }
+        if (!name) return;
 
         if (roomId.length < 4) {
              alert('રૂમ ID માં ઓછામાં ઓછા ૪ અક્ષરો હોવા જોઈએ.');
@@ -819,6 +854,10 @@
         }
         
         socket.emit('joinRoom', { roomId, name });
+    });
+    
+    document.getElementById('startGameButton').addEventListener('click', () => {
+        socket.emit('startGame');
     });
 
     document.getElementById('submitVoteButton').addEventListener('click', () => {
