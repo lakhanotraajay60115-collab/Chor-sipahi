@@ -1,380 +1,392 @@
-// server.js (સંપૂર્ણ નવો કોડ)
-
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const path = require('path');
+const { log } = require('console');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-const PORT = process.env.PORT || 10000;
-const MAX_PLAYERS = 8;
-const MIN_PLAYERS = 4;
-const MAX_ROUNDS = 10;
+const PORT = process.env.PORT || 3000;
 
-// --- રૂમ લોજિક માટે મુખ્ય ઑબ્જેક્ટ ---
-let rooms = {}; // રૂમ ID -> { players, currentRound, roles, chatHistory, roundActive, maxRounds, currentLanguage }
+// ગેમ સ્ટેટ
+let rooms = {};
+let roomCounter = 1000;
 
-// રૂમ ID જનરેટ કરવા માટેનું સરળ ફંક્શન
+// સ્થિર ફાઇલો માટે 'public' ફોલ્ડરનો ઉપયોગ કરો
+app.use(express.static(path.join(__dirname, 'public')));
+
+// હોમપેજ
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ઉપયોગી ફંક્શન: રેન્ડમ રૂમ ID જનરેટ કરો
 function generateRoomId() {
-    return Math.random().toString(36).substring(2, 6).toUpperCase();
+    let id;
+    do {
+        id = Math.random().toString(36).substring(2, 6).toUpperCase();
+    } while (rooms[id]);
+    return id;
 }
 
-// --- ગેમ લોજિક ફંક્શન્સ (હવે roomId સ્વીકારે છે) ---
-
-function getRoomState(roomId) {
-    return rooms[roomId];
-}
-
-function updateRoomPlayers(roomId, players) {
-    if (rooms[roomId]) {
-        rooms[roomId].players = players;
-    }
-}
-
-function assignRoles(roomId) {
-    const room = getRoomState(roomId);
-    if (!room) return;
-
-    let roles = ['રાજા', 'રાણી', 'વજીર', 'ચોર'];
-    const playerCount = Object.keys(room.players).length;
+// ઉપયોગી ફંક્શન: રેન્ડમ રોલ્સ સોંપો
+function assignRoles(playerIds) {
+    const roles = ['રાજા', 'રાણી', 'વજીર', 'ચોર'];
     
-    // ૪ થી વધુ ખેલાડીઓ માટે 'સિપાહી' ઉમેરો
-    if (playerCount > 4) {
-        const extraRoles = playerCount - 4;
-        for (let i = 0; i < extraRoles; i++) {
+    // જો ૫ કે તેથી વધુ ખેલાડી હોય, તો સિપાહી ઉમેરો
+    if (playerIds.length >= 5) {
+        // બાકીના સ્લોટ સિપાહી માટે ભરો
+        const requiredSipahi = playerIds.length - roles.length;
+        for (let i = 0; i < requiredSipahi; i++) {
             roles.push('સિપાહી');
         }
     }
-
-    // રોલને શફલ કરો
+    
+    // રોલ્સને શફલ કરો
     for (let i = roles.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [roles[i], roles[j]] = [roles[j], roles[i]];
     }
 
-    let roleIndex = 0;
-    const playerIds = Object.keys(room.players);
-    let newPlayers = { ...room.players };
-
-    playerIds.forEach(id => {
-        newPlayers[id].currentRole = roles[roleIndex++];
-        newPlayers[id].isVoted = false;
-        newPlayers[id].roundMessage = ''; 
+    const assignedRoles = {};
+    playerIds.forEach((id, index) => {
+        assignedRoles[id] = roles[index];
     });
-
-    updateRoomPlayers(roomId, newPlayers);
-    room.roundActive = true;
-    
-    // દરેક ખેલાડીને તેનો રોલ મોકલો
-    playerIds.forEach(id => {
-        io.to(id).emit('yourRole', newPlayers[id].currentRole);
-    });
+    return assignedRoles;
 }
 
-
-function checkVotes(roomId) {
-    const room = getRoomState(roomId);
-    if (!room || !room.roundActive) return;
-
-    const totalPlayers = Object.keys(room.players).length;
-    const votedPlayers = Object.values(room.players).filter(p => p.isVoted).length;
-
-    if (votedPlayers >= totalPlayers - 1) { // ચોર સિવાયના બધાએ વોટ કર્યો
-        endRound(roomId);
-    }
-}
-
-function endRound(roomId) {
-    const room = getRoomState(roomId);
-    if (!room || !room.roundActive) return;
-
-    room.roundActive = false;
-    room.currentRound++;
-    
-    let thiefId = null;
-    let thiefName = '';
-    
-    // રાઉન્ડના પરિણામોની ગણતરી કરો
-    let newPlayers = { ...room.players };
-    
-    // રોલ આઈડેન્ટિફિકેશન
-    Object.values(newPlayers).forEach(p => {
-        if (p.currentRole === 'ચોર') {
-            thiefId = p.id;
-            thiefName = p.name;
-        }
-    });
-
-    let voteCount = {};
-    let thiefCaught = false;
-    let thiefPointsGain = 0;
-
-    // વોટની ગણતરી
-    Object.keys(room.votes).forEach(voterId => {
-        const votedId = room.votes[voterId];
-        voteCount[votedId] = (voteCount[votedId] || 0) + 1;
-    });
-
-    // સૌથી વધુ વોટ મેળવનાર ખેલાડી
-    const maxVotesPlayerId = Object.keys(voteCount).reduce((a, b) => (voteCount[a] > voteCount[b] ? a : b), null);
-    
-    // જો ચોર પકડાઈ ગયો હોય
-    if (maxVotesPlayerId === thiefId) {
-        thiefCaught = true;
-    }
-
-    // સ્કોર અપડેટ લોજિક
-    Object.values(newPlayers).forEach(p => {
+// ઉપયોગી ફંક્શન: ગેમ પોઈન્ટ્સ અપડેટ કરો
+function updateScores(room, thiefCaught) {
+    const players = room.players;
+    Object.values(players).forEach(p => {
         const role = p.currentRole;
-        let points = 0;
-        let messageKey = '';
+        if (role === 'રાજા' && thiefCaught) p.totalScore += 100;
+        if (role === 'રાણી' && thiefCaught) p.totalScore += 50;
+        if (role === 'વજીર' && thiefCaught) p.totalScore += 75;
+        if (role === 'સિપાહી' && thiefCaught) p.totalScore += 25;
+        if (role === 'ચોર' && !thiefCaught) p.totalScore += 100;
 
-        if (thiefCaught) {
-            // ચોર પકડાય તો બધા રોલ (ચોર સિવાય) ને પોઈન્ટ મળે
-            if (role === 'રાજા') points = 50;
-            else if (role === 'રાણી') points = 50;
-            else if (role === 'વજીર') points = 50;
-            else if (role === 'સિપાહી') points = 30; // સિપાહીને પણ પોઈન્ટ
-            
-            if (role === 'ચોર') {
-                points = -20; // ચોરને નેગેટિવ પોઈન્ટ
-                messageKey = 'ચોર પકડાયો: -૨૦';
-            } else {
-                messageKey = 'ચોર પકડાયો: + પોઈન્ટ';
-            }
-
+        // રાઉન્ડ મેસેજ સેટ કરો
+        if (role === 'ચોર') {
+            p.roundMessage = thiefCaught ? 'ચોર પકડાયો' : 'ચોર ભાગી ગયો';
+        } else if (role === 'રાજા') {
+            p.roundMessage = thiefCaught ? 'ચોરને પકડવામાં મદદ કરી' : 'ચોર ભાગી ગયો';
+        } else if (role === 'વજીર') {
+            p.roundMessage = thiefCaught ? 'સાચો નિર્ણય લીધો' : 'ખોટો નિર્ણય લીધો';
         } else {
-            // ચોર છટકી જાય તો માત્ર ચોરને પોઈન્ટ મળે
-            if (role === 'ચોર') {
-                points = 100;
-                thiefPointsGain = 100;
-                messageKey = 'ચોર છટકી ગયો: +૧૦૦';
-            } else {
-                messageKey = 'ચોર છટકી ગયો: ૦';
-            }
+            p.roundMessage = 'વોટ કર્યો';
         }
-
-        p.totalScore += points;
-        p.roundMessage = messageKey;
     });
-
-    // પરિણામ મોકલો
-    const roundResult = {
-        players: newPlayers,
-        thiefCaught,
-        thiefName,
-        thiefPointsGain,
-        nextRound: room.currentRound < room.maxRounds ? 'નવા રાઉન્ડ માટે તૈયાર થાઓ...' : 'આ છેલ્લો રાઉન્ડ હતો.',
-        currentLanguage: room.currentLanguage
-    };
-    
-    // વોટ અને પ્લેયર સ્ટેટ રીસેટ કરો
-    room.votes = {};
-    Object.values(newPlayers).forEach(p => p.isVoted = false);
-    updateRoomPlayers(roomId, newPlayers);
-
-    io.to(roomId).emit('roundResult', roundResult);
-
-    // ગેમ સમાપ્ત કરો કે નવો રાઉન્ડ શરૂ કરો
-    if (room.currentRound >= room.maxRounds) {
-        setTimeout(() => endGame(roomId), 5000); 
-    } else {
-        setTimeout(() => startNewRound(roomId), 8000); 
-    }
 }
 
-function startNewRound(roomId) {
-    const room = getRoomState(roomId);
-    if (!room) return;
-    
-    assignRoles(roomId);
-    io.to(roomId).emit('newRound', { round: room.currentRound, maxRounds: room.maxRounds, currentLanguage: room.currentLanguage });
-}
-
-function endGame(roomId) {
-    const room = getRoomState(roomId);
-    if (!room) return;
-
-    let finalScores = room.players;
-    
-    // વિજેતા શોધો
-    const winner = Object.values(finalScores).sort((a, b) => b.totalScore - a.totalScore)[0];
-
-    io.to(roomId).emit('gameEnd', { winner, finalScores, currentLanguage: room.currentLanguage });
-    
-    // રૂમ સાફ કરો
-    delete rooms[roomId]; 
-}
-
-
-// --- Socket.IO કનેક્શન અને રૂમ મેનેજમેન્ટ ---
-
+// મુખ્ય Socket.IO કનેક્શન લોજિક
 io.on('connection', (socket) => {
-    console.log('નવો ખેલાડી જોડાયો:', socket.id);
+    console.log(`User connected: ${socket.id}`);
     
-    // રૂમ બનાવવાની વિનંતી
+    // --- રૂમ અને પ્લેયર મેનેજમેન્ટ ---
+
     socket.on('createRoom', (name) => {
         const roomId = generateRoomId();
-        
-        // નવો રૂમ ઓબ્જેક્ટ બનાવો
+        socket.roomId = roomId;
+        socket.join(roomId);
+
         rooms[roomId] = {
-            players: {},
+            id: roomId,
+            players: {
+                [socket.id]: { id: socket.id, name, totalScore: 0, currentRole: null, isHost: true, roundMessage: '' }
+            },
+            hostId: socket.id,
             currentRound: 0,
-            votes: {},
-            roundActive: false,
-            maxRounds: MAX_ROUNDS,
-            chatHistory: [],
-            currentLanguage: 'gu' 
+            maxRounds: 10,
+            gameStarted: false,
+            // ભાષા સેટિંગ
+            currentLanguage: 'gu', 
+            // ચેટ હિસ્ટરી
+            chatHistory: []
         };
         
-        // ખેલાડીને રૂમમાં જોડો
-        socket.join(roomId);
-        socket.roomId = roomId;
-        
-        // ખેલાડી ડેટા
-        rooms[roomId].players[socket.id] = {
-            id: socket.id,
-            name: name,
-            currentRole: '',
-            totalScore: 0,
-            isHost: true, // બનાવનાર હંમેશા Host
-            isVoted: false,
-            roundMessage: ''
-        };
-        
-        socket.emit('roomCreated', { roomId, currentLanguage: rooms[roomId].currentLanguage, isHost: true });
+        socket.emit('roomCreated', { roomId: roomId, currentLanguage: 'gu', isHost: true });
         io.to(roomId).emit('playerListUpdate', Object.values(rooms[roomId].players));
-        console.log(`રૂમ ${roomId} બનાવવામાં આવ્યો. હોસ્ટ: ${name}`);
     });
 
-    // રૂમમાં જોડાવાની વિનંતી
-    socket.on('joinRoom', (data) => {
-        const { roomId, name } = data;
-        
-        if (!rooms[roomId]) {
-            return socket.emit('error', 'આ રૂમ ID અમાન્ય છે અથવા અસ્તિત્વમાં નથી.');
+    socket.on('joinRoom', ({ roomId, name }) => {
+        const room = rooms[roomId.toUpperCase()];
+        if (!room) {
+            return socket.emit('error', 'આ રૂમ ID અસ્તિત્વમાં નથી.');
+        }
+        if (Object.keys(room.players).length >= 8) {
+             return socket.emit('error', 'રૂમ ભરેલો છે. (મહત્તમ ૮ ખેલાડીઓ)');
         }
 
-        const room = rooms[roomId];
+        socket.roomId = room.id;
+        socket.join(room.id);
 
-        if (Object.keys(room.players).length >= MAX_PLAYERS) {
-            return socket.emit('error', 'રૂમ ભરાઈ ગયો છે.');
-        }
-        
-        // ખેલાડીને રૂમમાં જોડો
-        socket.join(roomId);
-        socket.roomId = roomId;
+        room.players[socket.id] = { id: socket.id, name, totalScore: 0, currentRole: null, isHost: false, roundMessage: '' };
 
-        // ખેલાડી ડેટા
-        room.players[socket.id] = {
-            id: socket.id,
-            name: name,
-            currentRole: '',
-            totalScore: 0,
-            isHost: false,
-            isVoted: false,
-            roundMessage: ''
-        };
-        
-        socket.emit('roomJoined', { roomId, currentLanguage: room.currentLanguage, isHost: false });
-        
-        // નવા જોડાનારને ચેટનો ઇતિહાસ મોકલો
-        if (room.chatHistory.length > 0) {
-            socket.emit('loadChatHistory', room.chatHistory); 
-        }
-
-        io.to(roomId).emit('playerListUpdate', Object.values(room.players));
-        console.log(`ખેલાડી ${name} રૂમ ${roomId} માં જોડાયો.`);
-
-        // જો ૪ ખેલાડીઓ પૂરા થાય તો ગેમ શરૂ કરો
-        if (Object.keys(room.players).length === MIN_PLAYERS && !room.roundActive) {
-            startNewRound(roomId);
-        }
+        socket.emit('roomJoined', { roomId: room.id, currentLanguage: room.currentLanguage, isHost: false });
+        socket.emit('loadChatHistory', room.chatHistory);
+        io.to(room.id).emit('playerListUpdate', Object.values(room.players));
     });
 
-    // ભાષા બદલવાની વિનંતી (માત્ર હોસ્ટ દ્વારા)
     socket.on('setLanguage', (lang) => {
-        if (!socket.roomId || !rooms[socket.roomId]) return;
-        
         const room = rooms[socket.roomId];
-        
-        // ખાતરી કરો કે વિનંતી કરનાર હોસ્ટ છે
-        if (room.players[socket.id] && room.players[socket.id].isHost) {
+        if (room && socket.id === room.hostId) {
             room.currentLanguage = lang;
+            // રૂમના બધા સભ્યોને જાણ કરો
             io.to(socket.roomId).emit('languageChanged', lang);
         }
     });
-
-    // વોટ સબમિટ કરવો
-    socket.on('submitVote', (votedId) => {
-        if (!socket.roomId || !rooms[socket.roomId] || !rooms[socket.roomId].players[socket.id] || !rooms[socket.roomId].roundActive) return;
-        
-        const room = rooms[socket.roomId];
-
-        if (room.players[socket.id].currentRole === 'ચોર') {
-            return; // ચોર વોટ કરી શકતો નથી
-        }
-        
-        room.votes[socket.id] = votedId;
-        room.players[socket.id].isVoted = true;
-        
-        // રૂમના બધા ખેલાડીઓને મોકલો કે વોટ આવી ગયો છે
-        io.to(socket.roomId).emit('voteUpdate', { message: `${room.players[socket.id].name} એ વોટ કર્યો છે.` });
-
-        checkVotes(socket.roomId);
-    });
-
-    // ચેટ મેસેજ
-    socket.on('chatMessage', (msg) => {
-        if (!socket.roomId || !rooms[socket.roomId] || !rooms[socket.roomId].players[socket.id]) return;
-
-        const room = rooms[socket.roomId];
-        const sender = room.players[socket.id].name;
-        const messageObject = { name: sender, message: msg, timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) };
-        
-        room.chatHistory.push(messageObject); // મેસેજ હિસ્ટરીમાં સેવ કરો
-        
-        // માત્ર છેલ્લા 50 મેસેજ જ રાખો (મેમરી બચાવવા)
-        if (room.chatHistory.length > 50) {
-            room.chatHistory.shift(); 
-        }
-        
-        io.to(socket.roomId).emit('chatMessage', messageObject); // રૂમના બધા ક્લાયન્ટને મોકલો
-    });
-
-    // ડિસ્કનેક્ટ
-    socket.on('disconnect', () => {
-        if (!socket.roomId || !rooms[socket.roomId]) return;
-
-        const roomId = socket.roomId;
+    
+    // --- ગેમ મેનેજમેન્ટ ---
+    
+    // ગેમ શરૂ કરવા માટે ટાઈમર સેટ કરો
+    const MIN_PLAYERS = 4;
+    function startGameTimer(roomId) {
         const room = rooms[roomId];
-        const playerName = room.players[socket.id] ? room.players[socket.id].name : 'અજ્ઞાત ખેલાડી';
+        if (!room || room.gameStarted) return;
+        
+        if (Object.keys(room.players).length >= MIN_PLAYERS) {
+            // અહીંથી રાઉન્ડ શરૂ કરો
+            startNewRound(roomId);
+        }
+    }
+
+    function startNewRound(roomId) {
+        const room = rooms[roomId];
+        if (!room || room.currentRound >= room.maxRounds) {
+            return endGame(roomId);
+        }
+
+        room.gameStarted = true;
+        room.currentRound++;
+        
+        const playerIds = Object.keys(room.players);
+        const roles = assignRoles(playerIds);
+        
+        let thiefId = null;
+
+        // ખેલાડીના રોલ્સ અપડેટ કરો અને તેમને મોકલો
+        playerIds.forEach(id => {
+            room.players[id].currentRole = roles[id];
+            // ચોરને શોધો
+            if (roles[id] === 'ચોર') {
+                thiefId = id;
+            }
+            io.to(id).emit('yourRole', roles[id]);
+        });
+        
+        room.thiefId = thiefId;
+        room.votes = {}; // વોટ્સ રીસેટ કરો
+        
+        io.to(roomId).emit('newRound', {
+            round: room.currentRound,
+            maxRounds: room.maxRounds
+        });
+    }
+
+    function endGame(roomId) {
+        const room = rooms[roomId];
+        if (!room) return;
+
+        let winner = null;
+        let maxScore = -1;
+
+        // વિજેતા શોધો
+        Object.values(room.players).forEach(p => {
+            if (p.totalScore > maxScore) {
+                maxScore = p.totalScore;
+                winner = p;
+            } else if (p.totalScore === maxScore) {
+                // ટાઈ હોય તો, છેલ્લા વિજેતાને રહેવા દો
+            }
+        });
+
+        io.to(roomId).emit('gameEnd', {
+            finalScores: room.players,
+            winner: winner,
+            currentLanguage: room.currentLanguage
+        });
+
+        // રૂમનો ડેટા સાફ કરો (ગેમ સમાપ્ત થયા પછી તરત જ રૂમ દૂર કરશો નહીં)
+        room.gameStarted = false;
+        room.currentRound = 0;
+        Object.values(room.players).forEach(p => p.currentRole = null);
+        // રૂમનો ડેટા સાફ કરવાની નીતિ અહીં લાગુ કરો.
+
+        // જો રૂમમાં પ્લેયર્સ ન હોય તો 30 સેકન્ડ પછી રૂમ દૂર કરો
+        if (Object.keys(room.players).length === 0) {
+            delete rooms[roomId];
+        }
+    }
+    
+    // વોટ સબમિટ ઇવેન્ટ
+    socket.on('submitVote', (votedPlayerId) => {
+        const room = rooms[socket.roomId];
+        if (!room || !room.gameStarted) return;
+
+        const voter = room.players[socket.id];
+        
+        // જો રાજા/વજીર ન હોય કે ચોર ન હોય તો વોટ સ્વીકારો
+        if (voter.currentRole !== 'ચોર') { 
+            room.votes[socket.id] = votedPlayerId;
+        }
+
+        const playersCount = Object.keys(room.players).length;
+        const votesCast = Object.keys(room.votes).length;
+
+        // રૂમમાં ચોર સિવાયના ખેલાડીઓની સંખ્યા
+        const nonThiefCount = playersCount - 1; 
+
+        io.to(socket.roomId).emit('voteUpdate', {
+            message: `${voter.name} એ વોટ કર્યો છે. (${votesCast}/${nonThiefCount} વોટ પડ્યા)`
+        });
+
+        if (votesCast >= nonThiefCount) {
+            processVotes(socket.roomId);
+        }
+    });
+
+    function processVotes(roomId) {
+        const room = rooms[roomId];
+        if (!room) return;
+
+        const votedForThief = {}; // કયા ખેલાડીને વોટ મળ્યા તેની ગણતરી
+        Object.values(room.votes).forEach(votedId => {
+            votedForThief[votedId] = (votedForThief[votedId] || 0) + 1;
+        });
+
+        // સૌથી વધુ વોટ કોને મળ્યા
+        let maxVotes = 0;
+        let mostVotedPlayerId = null;
+
+        for (const id in votedForThief) {
+            if (votedForThief[id] > maxVotes) {
+                maxVotes = votedForThief[id];
+                mostVotedPlayerId = id;
+            }
+        }
+
+        const thiefCaught = mostVotedPlayerId === room.thiefId;
+
+        // સ્કોર અપડેટ કરો
+        updateScores(room, thiefCaught);
+
+        io.to(roomId).emit('roundResult', {
+            thiefCaught,
+            thiefName: room.players[room.thiefId].name,
+            thiefPointsGain: 100, // ચોર ભાગી જાય તો 100 પોઈન્ટ મળે છે
+            players: room.players,
+            currentLanguage: room.currentLanguage
+        });
+
+        // નવા રાઉન્ડ માટે ટાઈમર સેટ કરો
+        setTimeout(() => {
+            if (room.gameStarted) {
+                startNewRound(roomId);
+            }
+        }, 5000); // 5 સેકન્ડ પછી નવો રાઉન્ડ શરૂ કરો
+    }
+
+    // --- ચેટ અને વૉઇસ ચેટ સિગ્નલિંગ ---
+
+    socket.on('chatMessage', (message) => {
+        const room = rooms[socket.roomId];
+        if (room) {
+            const playerName = room.players[socket.id]?.name || 'અજાણ્યો ખેલાડી';
+            const timestamp = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+            const chatData = { name: playerName, message, timestamp };
+            
+            room.chatHistory.push(chatData);
+            // ચેટ હિસ્ટરીની સાઈઝ જાળવો
+            if (room.chatHistory.length > 50) {
+                room.chatHistory.shift();
+            }
+
+            io.to(socket.roomId).emit('chatMessage', chatData);
+        }
+    });
+    
+    // --- WebRTC સિગ્નલિંગ ---
+    
+    // ક્લાયન્ટ વૉઇસ માટે તૈયાર છે (માઇક્રોફોન શરૂ થયો)
+    socket.on('voiceReady', () => {
+        const room = rooms[socket.roomId];
+        if (room) {
+            // રૂમના બધા સભ્યોને જાણ કરો કે આ યુઝર (socket.id) WebRTC માટે તૈયાર છે
+            socket.to(socket.roomId).emit('userReadyForVoice', socket.id);
+        }
+    });
+    
+    // ક્લાયન્ટ વૉઇસ બંધ કરે છે
+    socket.on('voiceStop', () => {
+        const room = rooms[socket.roomId];
+        if (room) {
+            socket.to(socket.roomId).emit('userDisconnectedVoice', socket.id);
+        }
+    });
+
+    // ક્લાયન્ટ દ્વારા મોકલેલ ICE Candidate (નેટવર્ક માહિતી)
+    socket.on('iceCandidate', (data) => {
+        // આ મેસેજ માત્ર લક્ષ્ય ક્લાયન્ટને મોકલો
+        socket.to(data.toId).emit('iceCandidate', {
+            candidate: data.candidate,
+            fromId: socket.id
+        });
+    });
+
+    // ક્લાયન્ટ દ્વારા મોકલેલ SDP Offer (કનેક્શન ઓફર)
+    socket.on('offer', (data) => {
+        // આ મેસેજ માત્ર લક્ષ્ય ક્લાયન્ટને મોકલો
+        socket.to(data.toId).emit('offer', {
+            offer: data.offer,
+            fromId: socket.id
+        });
+    });
+
+    // ક્લાયન્ટ દ્વારા મોકલેલ SDP Answer (ઓફરનો સ્વીકાર)
+    socket.on('answer', (data) => {
+        // આ મેસેજ માત્ર લક્ષ્ય ક્લાયન્ટને મોકલો
+        socket.to(data.toId).emit('answer', {
+            answer: data.answer,
+            fromId: socket.id
+        });
+    });
+    
+    // --- ડિસ્કનેક્ટ મેનેજમેન્ટ ---
+
+    socket.on('disconnecting', () => {
+        const room = rooms[socket.roomId];
+        if (!room) return;
+        
+        // WebRTC કનેક્શન બંધ કરવા માટે અન્ય યુઝર્સને જાણ કરો
+        socket.to(socket.roomId).emit('userDisconnectedVoice', socket.id);
 
         delete room.players[socket.id];
-        
-        console.log(`ખેલાડી ${playerName} (${socket.id}) રૂમ ${roomId} માંથી ડિસ્કનેક્ટ થયો.`);
 
-        if (Object.keys(room.players).length === 0) {
-            // જો રૂમમાં કોઈ ન હોય તો રૂમ સાફ કરો
-            delete rooms[roomId];
-            console.log(`રૂમ ${roomId} સાફ કરવામાં આવ્યો.`);
-        } else {
-            // જો હોસ્ટ ડિસ્કનેક્ટ થાય તો નવા હોસ્ટને એસાઇન કરો
-            if (!Object.values(room.players).some(p => p.isHost)) {
-                const firstPlayerId = Object.keys(room.players)[0];
-                room.players[firstPlayerId].isHost = true;
-                io.to(firstPlayerId).emit('setHost', true);
+        // જો ડિસ્કનેક્ટ થનાર હોસ્ટ હોય
+        if (socket.id === room.hostId) {
+            const remainingPlayers = Object.keys(room.players);
+            if (remainingPlayers.length > 0) {
+                // નવા હોસ્ટને સોંપો
+                room.hostId = remainingPlayers[0];
+                room.players[room.hostId].isHost = true;
+                io.to(room.hostId).emit('setHost', true);
             }
-            // બાકીના ખેલાડીઓને અપડેટ કરો
-            io.to(roomId).emit('playerListUpdate', Object.values(room.players));
+        }
+        
+        io.to(socket.roomId).emit('playerListUpdate', Object.values(room.players));
+        
+        // જો ગેમ શરૂ થઈ ગઈ હોય અને ખેલાડીઓ MIN_PLAYERS કરતાં ઓછા થઈ જાય
+        if (room.gameStarted && Object.keys(room.players).length < MIN_PLAYERS) {
+            room.gameStarted = false;
+            io.to(socket.roomId).emit('error', 'ખેલાડીઓની સંખ્યા ઓછી થવાને કારણે ગેમ બંધ કરવામાં આવી છે.');
+            endGame(socket.roomId);
         }
     });
 });
 
-app.use(express.static('public'));
-
 server.listen(PORT, () => {
-    console.log(`સર્વર પોર્ટ ${PORT} પર ચાલી રહ્યું છે.`);
+    console.log(`Server running on port ${PORT}`);
 });
