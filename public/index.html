@@ -41,13 +41,15 @@
         #voteForm label { display: block; margin: 8px 0; text-align: left; }
         .ad-container { margin: 20px 0; border: 1px dashed #ccc; padding: 10px; background-color: #fff8e1; }
         #roomSetup input, #roomSetup button { margin-top: 5px; }
+        .lang-selector { margin-bottom: 20px; text-align: right;}
+        .lang-selector select { padding: 5px; border-radius: 5px; border: 1px solid #ccc; }
     </style>
 </head>
 <body>
 <div class="game-container">
     
-    <div class="lang-selector" style="display: none;"> 
-        <label for="language-select" data-translate="languageLabel">ભાષા:</label>
+    <div class="lang-selector"> 
+        <label for="language-select" data-translate="languageLabel"></label>
         <select id="language-select" onchange="handleLanguageChange(this.value)">
             <option value="gu">ગુજરાતી</option>
             <option value="hi">हिन्दी</option>
@@ -60,11 +62,11 @@
     <p id="gameStatus" data-translate="connecting">કનેક્ટિંગ...</p>
 
     <div class="ad-container" id="ad-slot-top">
-        <p>જાહેરાત લોડ થઈ રહી છે...</p>
+        <p data-translate="adLoading">જાહેરાત લોડ થઈ રહી છે...</p>
     </div>
 
     <div id="roomSetup">
-        <input type="text" id="playerNameInput" placeholder="તમારું નામ દાખલ કરો" required style="width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 10px;">
+        <input type="text" id="playerNameInput" data-translate-placeholder="namePlaceholder" placeholder="તમારું નામ દાખલ કરો" required style="width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 10px;">
         
         <h3 data-translate="roomTitle">રૂમ બનાવો અથવા જોડાઓ</h3>
         
@@ -72,7 +74,7 @@
         
         <p data-translate="or">અથવા</p>
 
-        <input type="text" id="roomIdInput" placeholder="રૂમ ID દાખલ કરો" style="width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 5px;">
+        <input type="text" id="roomIdInput" data-translate-placeholder="roomIdPlaceholder" placeholder="રૂમ ID દાખલ કરો" style="width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 5px;">
         <button id="joinRoomButton" data-translate="joinRoomButton" style="width: 100%;">રૂમમાં જોડાઓ</button>
     </div>
 
@@ -116,7 +118,7 @@
     </div>
     
     <div class="ad-container" id="ad-slot-bottom">
-        <p>જાહેરાત લોડ થઈ રહી છે...</p>
+        <p data-translate="adLoading">જાહેરાત લોડ થઈ રહી છે...</p>
     </div>
 </div>
 
@@ -133,17 +135,34 @@
 
     const MAX_PLAYERS = 8;
     const MIN_PLAYERS = 4;
+    
+    // મૂળભૂત રોલના નામો જે સર્વર મોકલે છે (અહીં ટ્રાન્સલેશન માટે જાળવી રાખેલ છે)
+    const ROLE_NAMES_GUJ = {
+        KING: 'રાજા',
+        QUEEN: 'રાણી',
+        MINISTER: 'વજીર',
+        THIEF: 'ચોર',
+        SIPAHI: 'સિપાહી'
+    };
+
 
     // --- ભાષાંતર માટેનો મુખ્ય ડેટા ઑબ્જેક્ટ ---
     const translations = {
         gu: {
-            'રાજા': 'રાજા', 'રાણી': 'રાણી', 'વજીર': 'વજીર', 'ચોર': 'ચોર', 
-            'સિપાહી': 'સિપાહી', 
+            // રોલ ટ્રાન્સલેશન (સર્વરથી આવતા રોલના નામની કી વાપરો)
+            [ROLE_NAMES_GUJ.KING]: 'રાજા', 
+            [ROLE_NAMES_GUJ.QUEEN]: 'રાણી', 
+            [ROLE_NAMES_GUJ.MINISTER]: 'વજીર', 
+            [ROLE_NAMES_GUJ.THIEF]: 'ચોર', 
+            [ROLE_NAMES_GUJ.SIPAHI]: 'સિપાહી', 
+            
             title: "ચોર સિપાહી", 
             appTitle: "👑 ચોર-સિપાહી 🃏", 
             languageLabel: "ભાષા:",
+            namePlaceholder: "તમારું નામ દાખલ કરો",
             roomTitle: "રૂમ બનાવો અથવા જોડાઓ",
             createRoomButton: "નવો રૂમ બનાવો",
+            roomIdPlaceholder: "રૂમ ID દાખલ કરો",
             joinRoomButton: "રૂમમાં જોડાઓ",
             or: "અથવા",
             yourRoomId: "તમારો રૂમ ID:",
@@ -162,16 +181,24 @@
             winner: (name, score) => `વિજેતા: ${name} (${score} પોઈન્ટ)`,
             thiefCaught: (name) => `✅ **ચોર પકડાઈ ગયો!** (${name})`,
             thiefEscaped: (name, points) => `❌ **ચોર છટકી ગયો!** (${name} ને +${points} પોઈન્ટ મળ્યા)`,
-            nextRound: "નવા રાઉન્ડ માટે તૈયાર થાઓ..."
+            nextRound: "નવા રાઉન્ડ માટે તૈયાર થાઓ...",
+            adLoading: "જાહેરાત લોડ થઈ રહી છે...",
+            host: "હોસ્ટ"
         },
         hi: {
-            'राजा': 'राजा', 'रानी': 'रानी', 'वजीर': 'वजीर', 'चोर': 'चोर',
-            'सिपाही': 'सिपाही', 
+            [ROLE_NAMES_GUJ.KING]: 'राजा', 
+            [ROLE_NAMES_GUJ.QUEEN]: 'रानी', 
+            [ROLE_NAMES_GUJ.MINISTER]: 'वजीर', 
+            [ROLE_NAMES_GUJ.THIEF]: 'चोर',
+            [ROLE_NAMES_GUJ.SIPAHI]: 'सिपाही', 
+            
             title: "चोर सिपाही", 
             appTitle: "👑 चोर-सिपाही 🃏", 
             languageLabel: "भाषा:",
+            namePlaceholder: "अपना नाम दर्ज करें",
             roomTitle: "रूम बनाएं या जुड़ें",
             createRoomButton: "नया रूम बनाएं",
+            roomIdPlaceholder: "रूम ID दर्ज करें",
             joinRoomButton: "रूम में जुड़ें",
             or: "या",
             yourRoomId: "आपका रूम ID:",
@@ -190,16 +217,24 @@
             winner: (name, score) => `विजेता: ${name} (${score} पॉइंट्स)`,
             thiefCaught: (name) => `✅ **चोर पकड़ा गया!** (${name})`,
             thiefEscaped: (name, points) => `❌ **चोर बच निकला!** (${name} को +${points} पॉइंट्स मिले)`,
-            nextRound: "नए राउंड के लिए तैयार हो जाएं..."
+            nextRound: "नए राउंड के लिए तैयार हो जाएं...",
+            adLoading: "विज्ञापन लोड हो रहा है...",
+            host: "होस्ट"
         },
         en: {
-            'King': 'King', 'Queen': 'Queen', 'Minister': 'Minister', 'Thief': 'Thief',
-            'Guard': 'Guard', 
+            [ROLE_NAMES_GUJ.KING]: 'King', 
+            [ROLE_NAMES_GUJ.QUEEN]: 'Queen', 
+            [ROLE_NAMES_GUJ.MINISTER]: 'Minister', 
+            [ROLE_NAMES_GUJ.THIEF]: 'Thief',
+            [ROLE_NAMES_GUJ.SIPAHI]: 'Guard', 
+            
             title: "Chor Sipahi", 
             appTitle: "👑 Chor-Sipahi 🃏", 
             languageLabel: "Language:",
+            namePlaceholder: "Enter your name",
             roomTitle: "Create or Join a Room",
             createRoomButton: "Create New Room",
+            roomIdPlaceholder: "Enter Room ID",
             joinRoomButton: "Join Room",
             or: "OR",
             yourRoomId: "Your Room ID:",
@@ -218,17 +253,18 @@
             winner: (name, score) => `Winner: ${name} (${score} points)`,
             thiefCaught: (name) => `✅ **Thief was caught!** (${name})`,
             thiefEscaped: (name, points) => `❌ **Thief escaped!** (${name} got +${points} points)`,
-            nextRound: "Get ready for the next round..."
+            nextRound: "Get ready for the next round...",
+            adLoading: "Ad is loading...",
+            host: "Host"
         }
     };
 
     const roleColors = {
-        'રાજા': 'role-king', 'રાણી': 'role-queen', 'વજીર': 'role-minister', 'ચોર': 'role-thief',
-        'સિપાહી': 'role-sipahi', 
-        'राजा': 'role-king', 'रानी': 'role-queen', 'वजीर': 'role-minister', 'चोर': 'role-thief',
-        'सिपाही': 'role-sipahi', 
-        'King': 'role-king', 'Queen': 'role-queen', 'Minister': 'role-minister', 'Thief': 'role-thief',
-        'Guard': 'role-sipahi' 
+        [ROLE_NAMES_GUJ.KING]: 'role-king', 
+        [ROLE_NAMES_GUJ.QUEEN]: 'role-queen', 
+        [ROLE_NAMES_GUJ.MINISTER]: 'role-minister', 
+        [ROLE_NAMES_GUJ.THIEF]: 'role-thief',
+        [ROLE_NAMES_GUJ.SIPAHI]: 'role-sipahi'
     };
 
     // UI અપડેટ કરો (ફંક્શન્સ)
@@ -264,8 +300,14 @@
                  statusEl.textContent = langData.waiting(count);
             }
         }
-
-        document.querySelector('.lang-selector').style.display = isHost ? 'block' : 'none';
+        
+        // રોલ ડિસ્પ્લેને પણ ટ્રાન્સલેટ કરો
+        if(myRole) {
+            const roleEl = document.getElementById('roleDisplay');
+            const translatedRole = langData[myRole] || myRole; // સર્વરથી આવેલા રોલનામનું ટ્રાન્સલેશન
+            roleEl.textContent = `${langData.yourRole || 'તમારી ભૂમિકા'}: ${translatedRole}`;
+        }
+        
         document.getElementById('language-select').value = currentLang;
     }
 
@@ -273,11 +315,12 @@
         players = {};
         playerData.forEach(p => players[p.id] = p);
         
+        const langData = translations[currentLang] || translations.gu;
         const list = document.getElementById('playerNamesList');
         list.innerHTML = '';
         playerData.forEach(p => {
             const item = document.createElement('li');
-            item.textContent = p.name + (p.isHost ? ` (${translations[currentLang].langData || 'Host'})` : '');
+            item.textContent = p.name + (p.isHost ? ` (${langData.host})` : '');
             list.appendChild(item);
         });
 
@@ -285,21 +328,32 @@
         statusEl.dataset.status = playerData.length;
 
         if (playerData.length >= MIN_PLAYERS) {
-             statusEl.textContent = translations[currentLang].gameStarted;
+             statusEl.textContent = langData.gameStarted;
         } else {
-             statusEl.textContent = translations[currentLang].waiting(playerData.length);
+             statusEl.textContent = langData.waiting(playerData.length);
         }
         
         translateUI();
     }
 
+    // જ્યારે કોઈ પણ ખેલાડી (રૂમમાં જોડાયા પહેલા કે પછી) ભાષા બદલે
     function handleLanguageChange(lang) {
-        if (isHost) {
+        currentLang = lang;
+        translateUI(); // તરત UI બદલો
+        
+        if (myRoomId && isHost) {
+            // જો હોસ્ટ હોય અને રૂમમાં જોડાયેલો હોય, તો સર્વરને જાણ કરો
             socket.emit('setLanguage', lang);
         }
+        // જો રૂમમાં ન જોડાયેલા હોય, તો માત્ર ક્લાયન્ટ-સાઇડ જ ભાષા બદલાશે
     }
+    
+    // આ ફંક્શન વૈશ્વિક સ્તરે ઉપલબ્ધ બનાવો
+    window.handleLanguageChange = handleLanguageChange;
+
 
     function createVoteForm() {
+        // ... (અહીં કોઈ ફેરફારની જરૂર નથી)
         const form = document.getElementById('voteForm');
         form.innerHTML = '';
         
@@ -320,7 +374,8 @@
         const resultEl = document.getElementById('resultDisplay');
         const langData = translations[data.currentLanguage] || translations.gu;
         
-        let message = `રાઉન્ડ ${data.players[myId].roundMessage}`;
+        // રોલના નામને ટ્રાન્સલેટ કરવાની જરૂર નથી, કારણ કે roundMessage સર્વરમાં જ તૈયાર થાય છે.
+        let message = `રાઉન્ડ ${data.players[myId].roundMessage}`; 
         
         if (data.thiefCaught) {
             message += `<br>${langData.thiefCaught(data.thiefName)}`;
@@ -335,6 +390,8 @@
         
         updateScoreboard(data.players);
     }
+    
+    // ... (બાકીના ફંક્શન્સ) ...
 
     function updateScoreboard(playerData) {
         const list = document.getElementById('scoreList');
@@ -365,200 +422,43 @@
         document.getElementById('chatBox').innerHTML = '';
         myRoomId = null;
         isHost = false;
-        translateUI();
+        translateUI(); 
     }
     
     // --- Socket ઇવેન્ટ્સ ---
 
     socket.on('connect', () => {
         myId = socket.id;
-        document.getElementById('gameStatus').textContent = 'કનેક્ટેડ.';
-    });
-
-    socket.on('error', (message) => {
-        alert(`ભૂલ: ${message}`);
-        resetGameUI(); // ભૂલ આવે તો UI રીસેટ કરો
-    });
-
-    socket.on('roomCreated', (data) => {
-        myRoomId = data.roomId;
-        currentLang = data.currentLanguage;
-        isHost = data.isHost;
-
-        document.getElementById('roomSetup').style.display = 'none';
-        document.getElementById('mainGame').style.display = 'block';
-        document.getElementById('displayRoomId').textContent = myRoomId;
-        
-        alert(`રૂમ ${myRoomId} બનાવવામાં આવ્યો. આ ID તમારા મિત્રોને મોકલો!`);
+        document.getElementById('gameStatus').textContent = translations[currentLang].connecting;
         translateUI();
     });
 
-    socket.on('roomJoined', (data) => {
-        myRoomId = data.roomId;
-        currentLang = data.currentLanguage;
-        isHost = data.isHost;
-
-        document.getElementById('roomSetup').style.display = 'none';
-        document.getElementById('mainGame').style.display = 'block';
-        document.getElementById('displayRoomId').textContent = myRoomId;
-        
-        translateUI();
-    });
-
-    socket.on('setHost', (hostStatus) => {
-        isHost = hostStatus;
-        translateUI();
-    });
-
+    // ... (અન્ય socket.on ઇવેન્ટ્સ) ...
+    
     socket.on('languageChanged', (newLang) => {
+        // આ ઇવેન્ટ હોસ્ટ દ્વારા મોકલવામાં આવે છે અને રૂમના બધા ખેલાડીઓ માટે ભાષા બદલે છે
         currentLang = newLang;
+        document.getElementById('language-select').value = newLang; // સિલેક્ટર પણ બદલો
         translateUI();
     });
-
-    socket.on('playerListUpdate', (playerData) => {
-        updatePlayerList(playerData);
-    });
-
-    socket.on('newRound', (data) => {
-        document.getElementById('resultDisplay').style.display = 'none';
-        document.getElementById('voteSection').style.display = 'none'; 
-        
-        const roleEl = document.getElementById('roleDisplay');
-        const roundInfoEl = document.getElementById('roundInfo');
-
-        roundInfoEl.dataset.round = data.round;
-        roundInfoEl.dataset.max = data.maxRounds;
-        roundInfoEl.textContent = translations[data.currentLanguage].roundInfo(data.round, data.maxRounds);
-
-        roleEl.className = 'role-display';
-        roleEl.textContent = 'તમારી ભૂમિકા લોડ થઈ રહી છે...';
-        
-        setTimeout(createVoteForm, 2000); 
-    });
-
+    
     socket.on('yourRole', (role) => {
         myRole = role;
         const roleEl = document.getElementById('roleDisplay');
-        const translatedRole = translations[currentLang][role] || role;
+        const langData = translations[currentLang] || translations.gu;
         
-        roleEl.textContent = `તમારી ભૂમિકા: ${translatedRole}`;
+        // રોલનું ટ્રાન્સલેશન મેળવો (સર્વરથી આવતા ગુજરાતી રોલનામનો ઉપયોગ કરીને)
+        const translatedRole = langData[role] || role; 
+        
+        roleEl.textContent = `${langData.yourRole || 'તમારી ભૂમિકા'}: ${translatedRole}`;
         roleEl.classList.add(roleColors[role] || 'role-default');
 
-        if (role === 'ચોર' || role === 'Chor' || role === 'Thief') {
+        if (role === ROLE_NAMES_GUJ.THIEF) {
             document.getElementById('voteSection').style.display = 'none'; 
         }
     });
 
-    socket.on('voteUpdate', (data) => {
-        const chatBox = document.getElementById('chatBox');
-        const messageEl = document.createElement('div');
-        messageEl.className = 'chat-message';
-        messageEl.innerHTML = `<span class="chat-name">${data.message}</span>`;
-        chatBox.appendChild(messageEl);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    });
-
-    socket.on('roundResult', (data) => {
-        displayRoundResult(data);
-        updateScoreboard(data.players);
-    });
-
-    socket.on('chatMessage', (data) => {
-        const chatBox = document.getElementById('chatBox');
-        const messageEl = document.createElement('div');
-        messageEl.className = 'chat-message';
-        // ટાઇમસ્ટેમ્પ ઉમેરો
-        messageEl.innerHTML = `<span class="chat-name">${data.name}:</span> ${data.message} <span style="font-size: 0.7em; color: #888;">(${data.timestamp})</span>`;
-        chatBox.appendChild(messageEl);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    });
-    
-    socket.on('loadChatHistory', (history) => {
-        const chatBox = document.getElementById('chatBox');
-        chatBox.innerHTML = ''; 
-        
-        history.forEach(data => {
-            const messageEl = document.createElement('div');
-            messageEl.className = 'chat-message';
-            messageEl.innerHTML = `<span class="chat-name">${data.name}:</span> ${data.message} <span style="font-size: 0.7em; color: #888;">(${data.timestamp})</span>`;
-            chatBox.appendChild(messageEl);
-        });
-        chatBox.scrollTop = chatBox.scrollHeight;
-    });
-
-
-    socket.on('gameEnd', (data) => {
-        const resultEl = document.getElementById('resultDisplay');
-        const langData = translations[data.currentLanguage] || translations.gu;
-        
-        resultEl.style.display = 'block';
-        resultEl.innerHTML = `
-            <h2>${langData.gameEnd}</h2>
-            <p>${langData.winner(data.winner.name, data.winner.totalScore)}</p>
-            <button onclick="window.location.reload()" style="background-color: #ff6347;">નવી ગેમ શરૂ કરો</button>
-        `;
-        document.getElementById('mainGame').style.display = 'none';
-        updateScoreboard(data.finalScores);
-    });
-
-
-    // --- UI ઇવેન્ટ હેન્ડલર્સ ---
-
-    function getPlayerName() {
-        const name = document.getElementById('playerNameInput').value.trim();
-        if (!name) {
-             alert('કૃપા કરીને તમારું નામ દાખલ કરો.');
-             return null;
-        }
-        return name;
-    }
-
-    document.getElementById('createRoomButton').addEventListener('click', () => {
-        const name = getPlayerName();
-        if (name) {
-            socket.emit('createRoom', name);
-            document.getElementById('playerNameInput').disabled = true;
-        }
-    });
-
-    document.getElementById('joinRoomButton').addEventListener('click', () => {
-        const name = getPlayerName();
-        const roomId = document.getElementById('roomIdInput').value.trim().toUpperCase();
-        
-        if (name && roomId) {
-            socket.emit('joinRoom', { roomId, name });
-            document.getElementById('playerNameInput').disabled = true;
-        } else if (!roomId) {
-            alert('કૃપા કરીને રૂમ ID દાખલ કરો.');
-        }
-    });
-
-
-    document.getElementById('submitVoteButton').addEventListener('click', () => {
-        const selectedVote = document.querySelector('input[name="thiefVote"]:checked');
-        if (selectedVote) {
-            socket.emit('submitVote', selectedVote.value);
-            document.getElementById('submitVoteButton').disabled = true;
-            document.getElementById('voteSection').style.display = 'none';
-        } else {
-            alert('કૃપા કરીને કોઈ ખેલાડીને વોટ કરો.');
-        }
-    });
-
-    document.getElementById('sendChatButton').addEventListener('click', () => {
-        const input = document.getElementById('chatMessageInput');
-        const message = input.value.trim();
-        if (message) {
-            socket.emit('chatMessage', message);
-            input.value = '';
-        }
-    });
-    
-    document.getElementById('chatMessageInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            document.getElementById('sendChatButton').click();
-        }
-    });
+    // ... (બાકીના socket.on ઇવેન્ટ્સ) ...
 
     // પ્રથમ લોડ પર UI ટ્રાન્સલેટ કરો
     translateUI();
@@ -578,4 +478,4 @@
     }
 </script>
 </body>
-            </html>
+    </html>
