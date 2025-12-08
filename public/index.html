@@ -183,7 +183,8 @@
             thiefEscaped: (name, points) => `❌ **ચોર છટકી ગયો!** (${name} ને +${points} પોઈન્ટ મળ્યા)`,
             nextRound: "નવા રાઉન્ડ માટે તૈયાર થાઓ...",
             adLoading: "જાહેરાત લોડ થઈ રહી છે...",
-            host: "હોસ્ટ"
+            host: "હોસ્ટ",
+            yourRole: "તમારી ભૂમિકા" // ✅ નવું ઉમેરાયેલું
         },
         hi: {
             [ROLE_NAMES_GUJ.KING]: 'राजा', 
@@ -219,7 +220,8 @@
             thiefEscaped: (name, points) => `❌ **चोर बच निकला!** (${name} को +${points} पॉइंट्स मिले)`,
             nextRound: "नए राउंड के लिए तैयार हो जाएं...",
             adLoading: "विज्ञापन लोड हो रहा है...",
-            host: "होस्ट"
+            host: "होस्ट",
+            yourRole: "आपकी भूमिका" // ✅ નવું ઉમેરાયેલું
         },
         en: {
             [ROLE_NAMES_GUJ.KING]: 'King', 
@@ -255,7 +257,8 @@
             thiefEscaped: (name, points) => `❌ **Thief escaped!** (${name} got +${points} points)`,
             nextRound: "Get ready for the next round...",
             adLoading: "Ad is loading...",
-            host: "Host"
+            host: "Host",
+            yourRole: "Your Role" // ✅ નવું ઉમેરાયેલું
         }
     };
 
@@ -286,9 +289,13 @@
         
         document.title = langData.title;
 
+        // રાઉન્ડ માહિતી ટ્રાન્સલેટ કરો (જો તે સેટ હોય તો)
         const roundInfoEl = document.getElementById('roundInfo');
         if (roundInfoEl.dataset.round && roundInfoEl.dataset.max) {
              roundInfoEl.textContent = langData.roundInfo(roundInfoEl.dataset.round, roundInfoEl.dataset.max);
+        } else {
+             // જો રાઉન્ડ હજી શરૂ ન થયો હોય, તો પણ મૂળભૂત ૦/૧૦ લેબલ ટ્રાન્સલેટ કરો
+             roundInfoEl.textContent = langData.roundInfo(0, 10);
         }
         
         const statusEl = document.getElementById('gameStatus');
@@ -301,11 +308,17 @@
             }
         }
         
-        // રોલ ડિસ્પ્લેને પણ ટ્રાન્સલેટ કરો
+        // રોલ ડિસ્પ્લેને પણ ટ્રાન્સલેટ કરો (આ મુખ્ય સુધારો છે)
+        const roleEl = document.getElementById('roleDisplay');
+        const defaultRoleLabel = langData.yourRole || 'તમારી ભૂમિકા'; 
+        
         if(myRole) {
-            const roleEl = document.getElementById('roleDisplay');
-            const translatedRole = langData[myRole] || myRole; // સર્વરથી આવેલા રોલનામનું ટ્રાન્સલેશન
-            roleEl.textContent = `${langData.yourRole || 'તમારી ભૂમિકા'}: ${translatedRole}`;
+            // જો રોલ મળ્યો હોય, તો રોલના નામને ટ્રાન્સલેટ કરો
+            const translatedRole = langData[myRole] || myRole; 
+            roleEl.textContent = `${defaultRoleLabel}: ${translatedRole}`;
+        } else if (roleEl) {
+            // જો રોલ ન મળ્યો હોય (અથવા ગેમ શરૂ ન થઈ હોય), તો માત્ર લેબલ ટ્રાન્સલેટ કરો
+            roleEl.textContent = `${defaultRoleLabel}: ?`;
         }
         
         document.getElementById('language-select').value = currentLang;
@@ -366,6 +379,9 @@
         
         document.getElementById('voteSection').style.display = 'block';
         document.getElementById('submitVoteButton').disabled = false;
+        
+        // વોટ પ્રોમ્પ્ટને ટ્રાન્સલેટ કરો
+        document.querySelector('#voteSection h3').textContent = translations[currentLang].votePrompt;
     }
 
     function displayRoundResult(data) {
@@ -424,6 +440,7 @@
         document.getElementById('playerNamesList').innerHTML = '';
         document.getElementById('displayRoomId').textContent = '';
         document.getElementById('chatBox').innerHTML = '';
+        myRole = ''; // રોલ સ્ટેટ રીસેટ કરો
         myRoomId = null;
         isHost = false;
         translateUI(); 
@@ -494,25 +511,25 @@
         const roleEl = document.getElementById('roleDisplay');
         const roundInfoEl = document.getElementById('roundInfo');
 
+        // ડેટા એટ્રિબ્યુટ્સ સેટ કરો જેથી ભાષા બદલતી વખતે તે ટ્રાન્સલેટ થઈ શકે
         roundInfoEl.dataset.round = data.round;
         roundInfoEl.dataset.max = data.maxRounds;
-        roundInfoEl.textContent = translations[data.currentLanguage].roundInfo(data.round, data.maxRounds);
+        
+        // UI અપડેટ કરો
+        translateUI(); 
 
         roleEl.className = 'role-display';
-        roleEl.textContent = 'તમારી ભૂમિકા લોડ થઈ રહી છે...';
         
         setTimeout(createVoteForm, 2000); 
     });
 
     socket.on('yourRole', (role) => {
         myRole = role;
+        
+        // રોલ મળ્યા પછી UI ટ્રાન્સલેટ કરો
+        translateUI();
+
         const roleEl = document.getElementById('roleDisplay');
-        const langData = translations[currentLang] || translations.gu;
-        
-        // રોલનું ટ્રાન્સલેશન મેળવો (સર્વરથી આવતા ગુજરાતી રોલનામનો ઉપયોગ કરીને)
-        const translatedRole = langData[role] || role; 
-        
-        roleEl.textContent = `${langData.yourRole || 'તમારી ભૂમિકા'}: ${translatedRole}`;
         roleEl.classList.add(roleColors[role] || 'role-default');
 
         if (role === ROLE_NAMES_GUJ.THIEF) {
@@ -646,4 +663,4 @@
     }
 </script>
 </body>
-</html>
+    </html>
