@@ -184,7 +184,7 @@
             nextRound: "નવા રાઉન્ડ માટે તૈયાર થાઓ...",
             adLoading: "જાહેરાત લોડ થઈ રહી છે...",
             host: "હોસ્ટ",
-            yourRole: "તમારી ભૂમિકા" // ✅ નવું ઉમેરાયેલું
+            yourRole: "તમારી ભૂમિકા" 
         },
         hi: {
             [ROLE_NAMES_GUJ.KING]: 'राजा', 
@@ -221,7 +221,7 @@
             nextRound: "नए राउंड के लिए तैयार हो जाएं...",
             adLoading: "विज्ञापन लोड हो रहा है...",
             host: "होस्ट",
-            yourRole: "आपकी भूमिका" // ✅ નવું ઉમેરાયેલું
+            yourRole: "आपकी भूमिका"
         },
         en: {
             [ROLE_NAMES_GUJ.KING]: 'King', 
@@ -258,7 +258,7 @@
             nextRound: "Get ready for the next round...",
             adLoading: "Ad is loading...",
             host: "Host",
-            yourRole: "Your Role" // ✅ નવું ઉમેરાયેલું
+            yourRole: "Your Role"
         }
     };
 
@@ -308,7 +308,7 @@
             }
         }
         
-        // રોલ ડિસ્પ્લેને પણ ટ્રાન્સલેટ કરો (આ મુખ્ય સુધારો છે)
+        // રોલ ડિસ્પ્લેને પણ ટ્રાન્સલેટ કરો 
         const roleEl = document.getElementById('roleDisplay');
         const defaultRoleLabel = langData.yourRole || 'તમારી ભૂમિકા'; 
         
@@ -322,31 +322,49 @@
         }
         
         document.getElementById('language-select').value = currentLang;
+        
+        // પ્લેયર લિસ્ટ અપડેટ કરો જેથી હોસ્ટ લેબલ ટ્રાન્સલેટ થાય
+        // Note: જો playerData ઉપલબ્ધ હોય તો જ આ ચાલે, અન્યથા કોઈ ફેરફાર નહીં
+        if (Object.keys(players).length > 0) {
+            updatePlayerList(Object.values(players)); 
+        }
     }
 
     function updatePlayerList(playerData) {
+        // ખાતરી કરો કે playerData એક એરે છે (જો તે object તરીકે આવે તો)
+        if (!Array.isArray(playerData)) {
+            playerData = Object.values(playerData);
+        }
+        
+        // players ગ્લોબલ ઑબ્જેક્ટ અપડેટ કરો
         players = {};
         playerData.forEach(p => players[p.id] = p);
         
         const langData = translations[currentLang] || translations.gu;
         const list = document.getElementById('playerNamesList');
         list.innerHTML = '';
+        
+        // પ્લેયર લિસ્ટ બનાવો અને હોસ્ટ લેબલ ટ્રાન્સલેટ કરો
         playerData.forEach(p => {
             const item = document.createElement('li');
-            item.textContent = p.name + (p.isHost ? ` (${langData.host})` : '');
+            const hostLabel = p.isHost ? ` (${langData.host})` : ''; // અહીં ટ્રાન્સલેશન કીનો ઉપયોગ થાય છે
+            item.textContent = p.name + hostLabel;
             list.appendChild(item);
         });
 
         const statusEl = document.getElementById('gameStatus');
         statusEl.dataset.status = playerData.length;
 
+        // gameStatus ને અપડેટ કરો
         if (playerData.length >= MIN_PLAYERS) {
              statusEl.textContent = langData.gameStarted;
         } else {
              statusEl.textContent = langData.waiting(playerData.length);
         }
         
-        translateUI();
+        // Note: અહીં translateUI() ને ફરીથી કૉલ કરવાની જરૂર નથી, કારણ કે મોટાભાગનું UI અપડેટ થઈ ગયું છે.
+        // જોકે, જો કોઈ અન્ય ઘટક હોય જે બાકી હોય તો translateUI() ને કૉલ કરી શકાય છે.
+        // translateUI();
     }
 
     // જ્યારે કોઈ પણ ખેલાડી (રૂમમાં જોડાયા પહેલા કે પછી) ભાષા બદલે
