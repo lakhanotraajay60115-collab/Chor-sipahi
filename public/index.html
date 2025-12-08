@@ -25,7 +25,7 @@
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: var(--background-color); color: #333; text-align: center; }
         .game-container { max-width: 600px; margin: 20px auto; padding: 20px; background-color: var(--card-background); border-radius: 10px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.1); }
         h1 { color: var(--primary-color); }
-        .role-display { padding: 15px; margin: 15px 0; border-radius: 8px; font-size: 1.2em; font-weight: bold; color: white; }
+        .role-display { padding: 15px; margin: 15px 0; border-radius: 8px; font-size: 1.2em; font-weight: bold; color: white; transition: background-color 0.5s; }
         .role-king { background-color: var(--king-color); }
         .role-queen { background-color: var(--queen-color); }
         .role-minister { background-color: var(--minister-color); }
@@ -43,6 +43,7 @@
         #roomSetup input, #roomSetup button { margin-top: 5px; }
         .lang-selector { margin-bottom: 20px; text-align: right;}
         .lang-selector select { padding: 5px; border-radius: 5px; border: 1px solid #ccc; }
+        .inactive-role { background-color: #ccc !important; color: #333 !important; }
     </style>
 </head>
 <body>
@@ -88,7 +89,9 @@
 
         <p id="roundInfo" data-translate-template="roundInfo">રાઉન્ડ: ૦/૧૦</p>
         
-        <div id="roleDisplay" class="role-display">તમારી ભૂમિકા: ?</div>
+        <p id="roleDisplayWrapper" style="margin-top: 10px; display: none;">
+             <strong id="roleDisplay" class="role-display inactive-role" style="padding: 15px; display: block; border-radius: 8px;">તમારી ભૂમિકા: ?</strong>
+        </p>
 
         <div id="chatSection">
             <h3 data-translate="chatTitle">ખેલાડીઓ સાથે વાતચીત</h3>
@@ -233,7 +236,7 @@
             connecting: "कनेक्टिंग...",
             roundInfo: (round, max) => `राउंड: ${round}/${max}`,
             waiting: (count) => `खिलाड़ियों का इंतज़ार है... (${count}/${MAX_PLAYERS})`, 
-            gameStarted: "गेम शुरू हो गई है!",
+            gameStarted: "ગેમ શરૂ થઈ ગઈ છે!",
             totalScoreTitle: "🏆 कुल स्कोर",
             activePlayersTitle: "सक्रिय खिलाड़ी",
             votePrompt: "कौन चोर है? वोट करें:",
@@ -252,7 +255,7 @@
             voiceStatus: "वॉयस चैट स्टेटस: निष्क्रिय",
             micButtonStart: "माइक शुरू करें",
             micButtonStop: "माइक बंद करें",
-            micPermissionError: "माइक्रोफ़ोन एक्सेस अस्वीકાર किया गया।",
+            micPermissionError: "माइक्रोफ़ोन एक्सेस अस्वीकार किया गया।",
             startGameButton: "गेम शुरू करें (होस्ट)"
         },
         en: {
@@ -384,8 +387,10 @@
             // જો રૂમ બન્યો હોય અને MIN_PLAYERS કરતા ઓછા હોય
             if(myRoomId && count < MIN_PLAYERS) {
                  statusEl.textContent = langData.waiting(count);
-            } else if (myRoomId) {
-                 statusEl.textContent = langData.gameStarted; // જો MIN_PLAYERS કરતા વધુ હોય
+            } else if (myRoomId && count >= MIN_PLAYERS) {
+                 statusEl.textContent = langData.gameStarted; 
+            } else if (!myRoomId) {
+                 statusEl.textContent = langData.connecting;
             }
         }
         
@@ -395,8 +400,10 @@
         if(myRole) {
             const translatedRole = langData[myRole] || myRole; 
             roleEl.textContent = `${defaultRoleLabel}: ${translatedRole}`;
+            roleEl.classList.remove('inactive-role');
         } else if (roleEl) {
             roleEl.textContent = `${defaultRoleLabel}: ?`;
+            roleEl.className = 'role-display inactive-role';
         }
         
         document.getElementById('language-select').value = currentLang;
@@ -410,9 +417,11 @@
                  toggleMicButton.textContent = langData.micButtonStop;
                  const activeText = currentLang === 'gu' ? 'સક્રિય' : currentLang === 'hi' ? 'सक्रिय' : 'Active';
                  voiceStatusEl.textContent = langData.voiceStatus.replace(/(નિષ્ક્રિય|Inactive|निष्ક્રિય)/, activeText);
+                 toggleMicButton.style.backgroundColor = '#4CAF50'; 
             } else {
                  toggleMicButton.textContent = langData.micButtonStart;
                  voiceStatusEl.textContent = langData.voiceStatus;
+                 toggleMicButton.style.backgroundColor = '#ff6347'; 
             }
         }
         
@@ -440,16 +449,14 @@
 
         const statusEl = document.getElementById('gameStatus');
         statusEl.dataset.status = playerData.length;
-
-        if (playerData.length >= MIN_PLAYERS && myRoomId) {
-             statusEl.textContent = langData.gameStarted;
-        } else if (myRoomId) {
-             statusEl.textContent = langData.waiting(playerData.length);
-        }
         
+        translateUI(); // સ્ટેટસ અને બટન અપડેટ કરવા માટે
+
         // હોસ્ટ બટનનું ડિસ્પ્લે
         const startGameButton = document.getElementById('startGameButton');
-        if (isHost && !players[myId].currentRole) { 
+        const isGameStarted = players[myId] && players[myId].currentRole;
+
+        if (isHost && !isGameStarted) { 
             startGameButton.style.display = 'block';
             startGameButton.disabled = playerData.length < MIN_PLAYERS;
         } else {
@@ -497,8 +504,13 @@
         document.getElementById('voteSection').style.display = 'none';
         document.getElementById('startGameButton').style.display = 'none'; 
         document.getElementById('roomSetup').style.display = 'block';
-        document.getElementById('roleDisplay').textContent = 'તમારી ભૂમિકા: ?';
-        document.getElementById('roleDisplay').className = 'role-display';
+        
+        // ભૂમિકા રીસેટ કરો
+        const roleEl = document.getElementById('roleDisplay');
+        roleEl.textContent = translations[currentLang].yourRole + ': ?';
+        roleEl.className = 'role-display inactive-role';
+        document.getElementById('roleDisplayWrapper').style.display = 'none';
+
         document.getElementById('scoreList').innerHTML = '';
         document.getElementById('playerNamesList').innerHTML = '';
         document.getElementById('displayRoomId').textContent = '';
@@ -539,8 +551,7 @@
                     remoteAudio = document.createElement('audio');
                     remoteAudio.id = `audio-${remoteId}`;
                     remoteAudio.autoplay = true;
-                    // Mute the remote audio by default to prevent feedback 
-                    remoteAudio.muted = false; // Set to false to hear other players
+                    remoteAudio.muted = false; 
                     document.getElementById('remoteAudioContainer').appendChild(remoteAudio); 
                 }
                 remoteAudio.srcObject = event.streams[0];
@@ -597,12 +608,8 @@
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             localStream = stream;
             
-            voiceStatusEl.textContent = translations[currentLang].voiceStatus.replace(
-                /(નિષ્ક્રિય|Inactive|निष्क्रिय)/, 
-                (currentLang === 'gu' ? 'સક્રિય' : currentLang === 'hi' ? 'सक्रिय' : 'Active')
-            );
-            toggleMicButton.textContent = translations[currentLang].micButtonStop;
-            toggleMicButton.style.backgroundColor = '#4CAF50'; 
+            translateUI(); // સ્ટેટસ અને બટન અપડેટ કરવા માટે
+            
             toggleMicButton.removeEventListener('click', startMic);
             toggleMicButton.addEventListener('click', stopMic);
             
@@ -617,8 +624,8 @@
         } catch (err) {
             console.error("Error accessing microphone:", err);
             alert(translations[currentLang].micPermissionError);
-            voiceStatusEl.textContent = translations[currentLang].voiceStatus;
             localStream = null;
+            translateUI(); // નિષ્ક્રિય સ્ટેટસ પર પાછા આવવા માટે
         }
     }
 
@@ -637,9 +644,7 @@
             localStream = null;
         }
         
-        voiceStatusEl.textContent = translations[currentLang].voiceStatus;
-        toggleMicButton.textContent = translations[currentLang].micButtonStart;
-        toggleMicButton.style.backgroundColor = '#ff6347'; 
+        translateUI(); // નિષ્ક્રિય સ્ટેટસ અને બટન અપડેટ કરવા માટે
         toggleMicButton.removeEventListener('click', stopMic);
         toggleMicButton.addEventListener('click', startMic);
         
@@ -673,6 +678,7 @@
         document.getElementById('roomSetup').style.display = 'none';
         document.getElementById('mainGame').style.display = 'block';
         document.getElementById('displayRoomId').textContent = myRoomId;
+        document.getElementById('roleDisplayWrapper').style.display = 'block'; // ભૂમિકા wrapper બતાવો
         
         handleLanguageChange(currentLang); 
         
@@ -687,7 +693,8 @@
         document.getElementById('roomSetup').style.display = 'none';
         document.getElementById('mainGame').style.display = 'block';
         document.getElementById('displayRoomId').textContent = myRoomId;
-        
+        document.getElementById('roleDisplayWrapper').style.display = 'block'; // ભૂમિકા wrapper બતાવો
+
         handleLanguageChange(currentLang);
     });
     
@@ -752,19 +759,12 @@
 
     socket.on('playerListUpdate', (playerData) => {
         updatePlayerList(playerData);
-        // જો ખેલાડીઓની સંખ્યા મિનિમમ હોય અને હોસ્ટ હોય, તો બટન બતાવો
-        const startGameButton = document.getElementById('startGameButton');
-        if (isHost && playerData.length >= MIN_PLAYERS) {
-            startGameButton.style.display = 'block';
-        } else if (isHost) {
-            startGameButton.style.display = 'none';
-        }
     });
 
     socket.on('newRound', (data) => {
         document.getElementById('resultDisplay').style.display = 'none';
         document.getElementById('voteSection').style.display = 'none'; 
-        document.getElementById('startGameButton').style.display = 'none'; // ગેમ શરૂ થયા પછી બટન છુપાવો
+        document.getElementById('startGameButton').style.display = 'none'; 
         
         const roundInfoEl = document.getElementById('roundInfo');
         roundInfoEl.dataset.round = data.round;
@@ -772,24 +772,29 @@
         
         translateUI(); 
 
-        document.getElementById('roleDisplay').className = 'role-display';
-        
         // 2 સેકન્ડ પછી વોટ ફોર્મ બનાવો
         setTimeout(createVoteForm, 2000); 
     });
 
+    // *** સુધારેલું ભૂમિકા ડિસ્પ્લે લોજિક ***
     socket.on('yourRole', (role) => {
         myRole = role;
         
-        translateUI();
-
         const roleEl = document.getElementById('roleDisplay');
-        roleEl.classList.add(roleColors[role] || 'role-default');
-
+        
+        translateUI(); // ભૂમિકાનું ભાષાંતર અને સ્ટેટસ અપડેટ કરવા માટે
+        
+        // ક્લાસ અને સ્ટાઇલ અપડેટ કરો
+        roleEl.className = 'role-display'; // મૂળભૂત ક્લાસ રીસેટ કરો
+        roleEl.classList.add(roleColors[role] || 'role-default'); // રંગ ક્લાસ ઉમેરો
+        
         if (role === ROLE_NAMES_GUJ.THIEF) {
             document.getElementById('voteSection').style.display = 'none'; 
+        } else {
+            document.getElementById('voteSection').style.display = 'block';
         }
     });
+    // **********************************
 
     socket.on('roundResult', (data) => {
         displayRoundResult(data);
